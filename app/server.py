@@ -6,6 +6,8 @@ via the Model Context Protocol (MCP).
 
 import argparse
 import contextlib
+import hmac
+import json
 import logging
 import sys
 
@@ -14,7 +16,7 @@ import uvicorn
 from fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, RedirectResponse
 from starlette.routing import Route
 
 from app.auth.keys import KeyStore
@@ -65,6 +67,49 @@ async def health(request: Request) -> JSONResponse:
         "database": "connected" if db_ok else "disconnected",
         "clockchain": bool(settings.FLASH_URL or settings.CLOCKCHAIN_URL),
     })
+
+
+async def root(request: Request) -> RedirectResponse:
+    """Redirect browser visitors to timepointai.com."""
+    return RedirectResponse("https://timepointai.com", status_code=302)
+
+
+async def admin_create_key(request: Request) -> JSONResponse:
+    """Create an MCP API key. Requires X-Admin-Key header (Flash admin key)."""
+    settings = get_settings()
+    admin_key = request.headers.get("X-Admin-Key", "")
+    if not admin_key or not settings.FLASH_ADMIN_KEY:
+        return JSONResponse({"error": "Missing X-Admin-Key header"}, status_code=401)
+    if not hmac.compare_digest(admin_key, settings.FLASH_ADMIN_KEY):
+        return JSONResponse({"error": "Invalid admin key"}, status_code=403)
+    if not key_store:
+        return JSONResponse({"error": "Database not available"}, status_code=503)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    user_id = body.get("user_id", "")
+    name = body.get("name", "default")
+    scopes = body.get("scopes", ["read", "generate"])
+    if not user_id:
+        return JSONResponse({"error": "user_id is required"}, status_code=400)
+
+    raw_key, info = await key_store.create_key(
+        user_id=user_id,
+        name=name,
+        scopes=scopes,
+    )
+    return JSONResponse({
+        "api_key": raw_key,
+        "key_id": info.id,
+        "key_prefix": info.key_prefix,
+        "user_id": info.user_id,
+        "name": info.name,
+        "scopes": info.scopes,
+        "warning": "Store this key securely — it will not be shown again.",
+    }, status_code=201)
 
 
 async def account_status(request: Request) -> JSONResponse:
@@ -135,7 +180,9 @@ def create_http_app() -> Starlette:
         await shutdown()
 
     routes = [
+        Route("/", root, methods=["GET"]),
         Route("/health", health, methods=["GET"]),
+        Route("/admin/create-key", admin_create_key, methods=["POST"]),
         Route("/account/status", account_status, methods=["GET"]),
     ]
 
