@@ -21,9 +21,11 @@ from starlette.routing import Route
 
 from app.auth.keys import KeyStore
 from app.auth.rate_limit import RateLimiter
+from app.clients.billing import BillingClient
 from app.clients.clockchain import ClockchainClient
 from app.clients.flash import FlashClient
 from app.config import get_settings
+from app.auth.tier import TierResolver
 from app.tools.clockchain import register_clockchain_tools
 from app.tools.clockchain_write import register_clockchain_write_tools
 
@@ -38,6 +40,8 @@ key_store: KeyStore | None = None
 rate_limiter = RateLimiter()
 clockchain_client: ClockchainClient | None = None
 flash_client: FlashClient | None = None
+billing_client: BillingClient | None = None
+tier_resolver: TierResolver | None = None
 
 # --- MCP server ---
 mcp = FastMCP(
@@ -143,7 +147,7 @@ async def admin_create_key(request: Request) -> JSONResponse:
 
 
 async def account_status(request: Request) -> JSONResponse:
-    """Basic account status — returns key info if authenticated."""
+    """Basic account status — returns key info and resolved tier if authenticated."""
     api_key = request.headers.get("X-API-Key", "")
     if not api_key or not key_store:
         return JSONResponse({
@@ -154,10 +158,15 @@ async def account_status(request: Request) -> JSONResponse:
     info = await key_store.validate_key(api_key)
     if not info:
         return JSONResponse({"authenticated": False, "error": "Invalid API key"}, status_code=401)
+
+    resolved_tier = "free"
+    if tier_resolver is not None:
+        resolved_tier = await tier_resolver.resolve_tier(info.user_id)
+
     return JSONResponse({
         "authenticated": True,
         "user_id": info.user_id,
-        "tier": "free",  # Phase 2: resolve from billing
+        "tier": resolved_tier,
         "scopes": info.scopes,
         "key_name": info.name,
     })
@@ -165,7 +174,7 @@ async def account_status(request: Request) -> JSONResponse:
 
 # --- Lifecycle ---
 async def startup():
-    global db_pool, key_store, clockchain_client, flash_client
+    global db_pool, key_store, clockchain_client, flash_client, billing_client, tier_resolver
     settings = get_settings()
 
     # Database
@@ -199,6 +208,19 @@ async def startup():
     else:
         logger.warning("No Flash service key — generation tools will be unavailable")
 
+    # Billing client + tier resolver
+    if settings.BILLING_URL and settings.BILLING_SERVICE_KEY:
+        billing_client = BillingClient(
+            base_url=settings.BILLING_URL,
+            service_key=settings.BILLING_SERVICE_KEY,
+        )
+        tier_resolver = TierResolver(billing_client)
+        logger.info("Billing client initialized")
+    else:
+        billing_client = None
+        tier_resolver = TierResolver(None)
+        logger.warning("No Billing service key — tier resolution will default to free")
+
     # Register tools
     register_clockchain_tools(mcp, clockchain_client)
     register_clockchain_write_tools(mcp, clockchain_client, flash_client, key_store, rate_limiter)
@@ -206,9 +228,11 @@ async def startup():
 
 
 async def shutdown():
-    global db_pool, clockchain_client, flash_client
+    global db_pool, clockchain_client, flash_client, billing_client
     if flash_client:
         await flash_client.close()
+    if billing_client:
+        await billing_client.close()
     if clockchain_client:
         await clockchain_client.close()
     if db_pool:
