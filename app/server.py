@@ -69,9 +69,29 @@ async def health(request: Request) -> JSONResponse:
     })
 
 
-async def root(request: Request) -> RedirectResponse:
-    """Redirect browser visitors to timepointai.com."""
-    return RedirectResponse("https://timepointai.com", status_code=302)
+async def root(request: Request) -> JSONResponse:
+    """Landing page for visitors and unauthenticated agents."""
+    accept = request.headers.get("accept", "")
+    # If a browser, redirect to the main site
+    if "text/html" in accept:
+        return RedirectResponse("https://timepointai.com", status_code=302)
+    # For agents/API callers, return instructions
+    return JSONResponse({
+        "service": "Timepoint MCP Server",
+        "version": VERSION,
+        "mcp_endpoint": "https://mcp.timepointai.com/mcp",
+        "docs": "https://github.com/timepointai/timepoint-mcp",
+        "get_api_key": {
+            "instructions": "To get an MCP API key, visit timepointai.com or reach out on X @timepointai.",
+            "website": "https://timepointai.com",
+            "twitter": "https://x.com/timepointai",
+        },
+        "free_tools": [
+            "search_moments", "get_moment", "browse_graph",
+            "get_connections", "today_in_history", "random_moment", "graph_stats",
+        ],
+        "note": "Clockchain read tools work without authentication (rate-limited). Generation tools require an API key and credits.",
+    })
 
 
 async def admin_create_key(request: Request) -> JSONResponse:
@@ -116,7 +136,11 @@ async def account_status(request: Request) -> JSONResponse:
     """Basic account status — returns key info if authenticated."""
     api_key = request.headers.get("X-API-Key", "")
     if not api_key or not key_store:
-        return JSONResponse({"authenticated": False, "tier": "anonymous"})
+        return JSONResponse({
+            "authenticated": False,
+            "tier": "anonymous",
+            "get_api_key": "Visit https://timepointai.com or contact @timepointai on X to request an API key.",
+        })
     info = await key_store.validate_key(api_key)
     if not info:
         return JSONResponse({"authenticated": False, "error": "Invalid API key"}, status_code=401)
