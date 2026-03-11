@@ -1,6 +1,10 @@
 """Billing client — subscription tier/status lookup for MCP users."""
 
+import logging
+
 import httpx
+
+logger = logging.getLogger("mcp.clients.billing")
 
 
 class BillingClient:
@@ -27,4 +31,6 @@ class BillingClient:
         }
         resp = await self._client.get(url, headers=headers)
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        logger.debug("billing status fetched for user_id=%s", user_id)
+        return data
