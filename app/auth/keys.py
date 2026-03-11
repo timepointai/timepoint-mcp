@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS mcp_api_keys (
     last_used_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
     revoked_at TIMESTAMPTZ,
-    rate_limit INT DEFAULT 60
+    rate_limit INT DEFAULT 60,
+    write_rate_limit INT DEFAULT 10
 );
 
 CREATE TABLE IF NOT EXISTS mcp_usage_logs (
@@ -54,6 +55,7 @@ class KeyInfo:
     name: str
     scopes: list[str]
     rate_limit: int
+    write_rate_limit: int
     created_at: datetime
     last_used_at: datetime | None
     expires_at: datetime | None
@@ -67,6 +69,13 @@ class KeyStore:
     async def init_schema(self):
         async with self.pool.acquire() as conn:
             await conn.execute(SCHEMA_DDL)
+            # Migration: add write_rate_limit column if missing (existing tables)
+            await conn.execute("""
+                DO $$ BEGIN
+                    ALTER TABLE mcp_api_keys ADD COLUMN write_rate_limit INT DEFAULT 10;
+                EXCEPTION WHEN duplicate_column THEN NULL;
+                END $$;
+            """)
 
     async def create_key(
         self,
@@ -74,6 +83,7 @@ class KeyStore:
         name: str,
         scopes: list[str] | None = None,
         rate_limit: int = 60,
+        write_rate_limit: int = 10,
     ) -> tuple[str, KeyInfo]:
         """Create a new API key. Returns (raw_key, key_info).
         The raw key is only returned once — store it securely."""
@@ -86,8 +96,8 @@ class KeyStore:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO mcp_api_keys (key_hash, key_prefix, user_id, name, scopes, rate_limit)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO mcp_api_keys (key_hash, key_prefix, user_id, name, scopes, rate_limit, write_rate_limit)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING id, created_at
                 """,
                 key_hash,
@@ -96,6 +106,7 @@ class KeyStore:
                 name,
                 scopes,
                 rate_limit,
+                write_rate_limit,
             )
         info = KeyInfo(
             id=str(row["id"]),
@@ -104,6 +115,7 @@ class KeyStore:
             name=name,
             scopes=scopes,
             rate_limit=rate_limit,
+            write_rate_limit=write_rate_limit,
             created_at=row["created_at"],
             last_used_at=None,
             expires_at=None,
@@ -119,7 +131,7 @@ class KeyStore:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT id, key_prefix, user_id, name, scopes, rate_limit,
+                SELECT id, key_prefix, user_id, name, scopes, rate_limit, write_rate_limit,
                        created_at, last_used_at, expires_at, revoked_at
                 FROM mcp_api_keys
                 WHERE key_hash = $1
@@ -144,6 +156,7 @@ class KeyStore:
             name=row["name"],
             scopes=list(row["scopes"]),
             rate_limit=row["rate_limit"],
+            write_rate_limit=row["write_rate_limit"] or 10,
             created_at=row["created_at"],
             last_used_at=row["last_used_at"],
             expires_at=row["expires_at"],
@@ -155,7 +168,7 @@ class KeyStore:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, key_prefix, user_id, name, scopes, rate_limit,
+                SELECT id, key_prefix, user_id, name, scopes, rate_limit, write_rate_limit,
                        created_at, last_used_at, expires_at, revoked_at
                 FROM mcp_api_keys
                 WHERE user_id = $1 AND revoked_at IS NULL
@@ -171,6 +184,7 @@ class KeyStore:
                 name=r["name"],
                 scopes=list(r["scopes"]),
                 rate_limit=r["rate_limit"],
+                write_rate_limit=r["write_rate_limit"] or 10,
                 created_at=r["created_at"],
                 last_used_at=r["last_used_at"],
                 expires_at=r["expires_at"],
