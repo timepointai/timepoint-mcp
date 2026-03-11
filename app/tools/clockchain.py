@@ -108,13 +108,19 @@ def register_clockchain_tools(mcp, clockchain_client):
         """Get causal and thematic connections for a historical moment.
 
         Returns neighboring events in the temporal graph with their relationship types:
-        - 'causes' — this event directly caused the neighbor
+        - 'causes' / 'caused_by' — direct causal relationships
+        - 'influences' — indirect causal influence
         - 'contemporaneous' — happened at the same time
         - 'same_location' — happened in the same place
-        - 'thematic' — shares themes or figures
+        - 'same_era' — happened in the same historical era
+        - 'same_conflict' — part of the same conflict or war
+        - 'same_figure' — involves the same historical figure
+        - 'thematic' — shares themes
+        - 'precedes' / 'follows' — temporal ordering
 
-        Use this to trace causal chains, find related events, and understand how
-        historical moments connect to each other.
+        Edges include a 'description' field with an explanation of why two events
+        are related. Use this to trace causal chains, find related events, and
+        understand how historical moments connect to each other.
         """
         result = await clockchain_client.neighbors(path.strip("/"))
         if isinstance(result, dict) and "error" in result:

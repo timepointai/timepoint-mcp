@@ -100,11 +100,22 @@ Public endpoints need no auth. Authenticated endpoints need `X-Service-Key`.
 | Neighbors | GET | `/api/v1/graph/neighbors/{path}` | Service-Key |
 | Stats | GET | `/api/v1/stats` | Public |
 
+**Write endpoints (used by MCP write tools):**
+
+| Purpose | Method | Path | Auth |
+|---------|--------|------|------|
+| Index moment | POST | `/api/v1/index` | Service-Key |
+| Update visibility | PATCH | `/api/v1/moments/{path}/visibility` | Service-Key |
+| Ingest TDF | POST | `/api/v1/ingest/tdf` | Service-Key |
+
 **Response shapes:**
-- Moments include: `path, name, one_liner, year, month, day, country, region, city, tags, figures, image_url, edges[]`
+- Moments include: `path, name, one_liner, year, month, day, country, region, city, tags, figures, image_url, edges[], schema_version`
+- v0.2 moments also include: `text_model, image_model, model_provider, model_permissiveness, generation_id, graph_state_hash`
 - Search results: `path, name, one_liner, score, image_url`
 - Browse items: `segment, count, label`
 - Stats: `total_nodes, total_edges, nodes_with_images, layer_counts, edge_type_counts, date_range`
+- Edge types (v0.2): `causes, caused_by, influences, contemporaneous, same_location, same_era, same_conflict, same_figure, thematic, precedes, follows`
+- Edges include: `type, target_path, description, created_by, schema_version`
 
 ### Billing (billing.timepointai.com)
 
@@ -202,7 +213,8 @@ CREATE TABLE mcp_api_keys (
     last_used_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
     revoked_at TIMESTAMPTZ,
-    rate_limit INT DEFAULT 60
+    rate_limit INT DEFAULT 60,
+    write_rate_limit INT DEFAULT 10
 );
 ```
 

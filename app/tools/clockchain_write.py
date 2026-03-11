@@ -159,6 +159,7 @@ def register_clockchain_write_tools(
                 "timepoint": result,
                 "source_type": "mcp_user",
                 "visibility": visibility,
+                "schema_version": "0.2",
             }
             index_result = await clockchain_client.index_moment(index_payload, user_id=key_info.user_id)
         except Exception as e:
@@ -251,13 +252,19 @@ def register_clockchain_write_tools(
         This bypasses the Flash generation pipeline and is intended for automated
         pipelines and bulk imports. Requires 'admin' scope. No credits are charged.
 
-        The TDF record must include at minimum: path, name, year, month, day.
+        The TDF record must include at minimum: path, name, year, month, day, schema_version.
+        For v0.2 records, model provenance fields (text_model, image_model, model_provider,
+        model_permissiveness, generation_id, graph_state_hash) should also be populated.
         """
         try:
             key_info = await _require_auth(request, key_store, "admin")
             _check_write_rate(key_info, rate_limiter)
         except AuthError as e:
             return {"error": e.message}
+
+        # Ensure schema_version is set — default to 0.2 for new entries
+        if "schema_version" not in tdf_record:
+            tdf_record["schema_version"] = "0.2"
 
         # Basic TDF validation
         required_fields = ["path", "name", "year", "month", "day"]
