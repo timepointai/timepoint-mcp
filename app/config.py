@@ -25,12 +25,18 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
     MCP_SIGNING_SECRET: str = ""
 
-    # Rate limits (requests per minute)
+    # Rate limits — read (requests per minute)
     RATE_LIMIT_ANONYMOUS: int = 30
     RATE_LIMIT_FREE: int = 60
     RATE_LIMIT_EXPLORER: int = 60
     RATE_LIMIT_CREATOR: int = 300
     RATE_LIMIT_STUDIO: int = 1000
+
+    # Rate limits — write (requests per minute)
+    RATE_LIMIT_WRITE_FREE: int = 5
+    RATE_LIMIT_WRITE_EXPLORER: int = 10
+    RATE_LIMIT_WRITE_CREATOR: int = 30
+    RATE_LIMIT_WRITE_STUDIO: int = 100
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

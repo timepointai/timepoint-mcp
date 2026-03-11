@@ -48,6 +48,20 @@ class ClockchainClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def _post(self, url: str, headers: dict, json: dict | None = None) -> dict:
+        resp = await self._client.post(url, headers=headers, json=json)
+        if resp.status_code == 404:
+            return {"error": "not_found", "detail": "Resource not found"}
+        resp.raise_for_status()
+        return resp.json()
+
+    async def _patch(self, url: str, headers: dict, json: dict | None = None) -> dict:
+        resp = await self._client.patch(url, headers=headers, json=json)
+        if resp.status_code == 404:
+            return {"error": "not_found", "detail": "Resource not found"}
+        resp.raise_for_status()
+        return resp.json()
+
     async def search(self, query: str, limit: int = 20, user_id: str | None = None) -> list:
         """Search moments. Uses Flash proxy (requires service key for search endpoint)."""
         url = f"{self._proxy_base()}/search"
@@ -102,3 +116,27 @@ class ClockchainClient:
         base = self._direct_base()
         url = f"{base}/stats"
         return await self._get(url, self._direct_headers())
+
+    async def index_moment(self, payload: dict, user_id: str) -> dict:
+        """Index a new moment into the clockchain.
+
+        Posts to /api/v1/index with created_by set to user_id.
+        """
+        url = f"{self._proxy_base()}/index"
+        payload["created_by"] = user_id
+        return await self._post(url, self._proxy_headers(user_id), json=payload)
+
+    async def update_visibility(self, path: str, visibility: str, user_id: str) -> dict:
+        """Update the visibility of a moment (e.g. private -> public).
+
+        Requires ownership — clockchain verifies created_by matches user_id.
+        """
+        clean_path = path.strip("/")
+        url = f"{self._proxy_base()}/moments/{clean_path}/visibility"
+        payload = {"visibility": visibility, "user_id": user_id}
+        return await self._patch(url, self._proxy_headers(user_id), json=payload)
+
+    async def ingest_tdf(self, tdf_record: dict) -> dict:
+        """Ingest a TDF record directly into the clockchain."""
+        url = f"{self._proxy_base()}/ingest/tdf"
+        return await self._post(url, self._proxy_headers(), json=tdf_record)

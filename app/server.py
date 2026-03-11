@@ -22,8 +22,10 @@ from starlette.routing import Route
 from app.auth.keys import KeyStore
 from app.auth.rate_limit import RateLimiter
 from app.clients.clockchain import ClockchainClient
+from app.clients.flash import FlashClient
 from app.config import get_settings
 from app.tools.clockchain import register_clockchain_tools
+from app.tools.clockchain_write import register_clockchain_write_tools
 
 logger = logging.getLogger("mcp")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -35,6 +37,7 @@ db_pool: asyncpg.Pool | None = None
 key_store: KeyStore | None = None
 rate_limiter = RateLimiter()
 clockchain_client: ClockchainClient | None = None
+flash_client: FlashClient | None = None
 
 # --- MCP server ---
 mcp = FastMCP(
@@ -90,7 +93,12 @@ async def root(request: Request) -> JSONResponse:
             "search_moments", "get_moment", "browse_graph",
             "get_connections", "today_in_history", "random_moment", "graph_stats",
         ],
-        "note": "Clockchain read tools work without authentication (rate-limited). Generation tools require an API key and credits.",
+        "authenticated_tools": [
+            "generate_moment (generate scope, 5-10 credits)",
+            "publish_moment (generate scope, 0 credits)",
+            "index_moment_from_tdf (admin scope, 0 credits)",
+        ],
+        "note": "Clockchain read tools work without authentication (rate-limited). Write tools require an API key with appropriate scopes and credits.",
     })
 
 
@@ -113,6 +121,7 @@ async def admin_create_key(request: Request) -> JSONResponse:
     user_id = body.get("user_id", "")
     name = body.get("name", "default")
     scopes = body.get("scopes", ["read", "generate"])
+    write_rate_limit = body.get("write_rate_limit", 10)
     if not user_id:
         return JSONResponse({"error": "user_id is required"}, status_code=400)
 
@@ -120,6 +129,7 @@ async def admin_create_key(request: Request) -> JSONResponse:
         user_id=user_id,
         name=name,
         scopes=scopes,
+        write_rate_limit=write_rate_limit,
     )
     return JSONResponse({
         "api_key": raw_key,
@@ -155,7 +165,7 @@ async def account_status(request: Request) -> JSONResponse:
 
 # --- Lifecycle ---
 async def startup():
-    global db_pool, key_store, clockchain_client
+    global db_pool, key_store, clockchain_client, flash_client
     settings = get_settings()
 
     # Database
@@ -179,13 +189,26 @@ async def startup():
         direct_service_key=settings.CLOCKCHAIN_SERVICE_KEY,
     )
 
+    # Flash client (for generation)
+    if settings.FLASH_URL and settings.FLASH_SERVICE_KEY:
+        flash_client = FlashClient(
+            base_url=settings.FLASH_URL,
+            service_key=settings.FLASH_SERVICE_KEY,
+        )
+        logger.info("Flash client initialized")
+    else:
+        logger.warning("No Flash service key — generation tools will be unavailable")
+
     # Register tools
     register_clockchain_tools(mcp, clockchain_client)
+    register_clockchain_write_tools(mcp, clockchain_client, flash_client, key_store, rate_limiter)
     logger.info("Timepoint MCP server started (v%s)", VERSION)
 
 
 async def shutdown():
-    global db_pool, clockchain_client
+    global db_pool, clockchain_client, flash_client
+    if flash_client:
+        await flash_client.close()
     if clockchain_client:
         await clockchain_client.close()
     if db_pool:
