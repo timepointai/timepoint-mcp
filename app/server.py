@@ -242,12 +242,21 @@ async def shutdown():
 
 # --- ASGI app ---
 def create_http_app() -> Starlette:
-    """Create the Starlette app that serves both MCP and plain HTTP endpoints."""
+    """Create the Starlette app that serves both MCP and plain HTTP endpoints.
+
+    FastMCP 3.x requires its lifespan (which initialises the session manager task group)
+    to be active.  We compose our own startup/shutdown with the MCP app's lifespan by
+    wrapping it: we run our init first, then delegate to mcp_app.lifespan, then our
+    teardown.
+    """
+    # Build the MCP sub-app once so we can reference its lifespan
+    mcp_app = mcp.http_app(path="/mcp")
 
     @contextlib.asynccontextmanager
     async def lifespan(app):
         await startup()
-        yield
+        async with mcp_app.lifespan(app):
+            yield
         await shutdown()
 
     routes = [
@@ -263,7 +272,6 @@ def create_http_app() -> Starlette:
     )
 
     # Mount MCP at /mcp
-    mcp_app = mcp.http_app(path="/mcp")
     app.mount("/mcp", mcp_app)
 
     return app
