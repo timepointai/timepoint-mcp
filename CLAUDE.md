@@ -22,7 +22,6 @@ This is an MCP (Model Context Protocol) server that provides AI agents access to
 
 - **Clockchain** — temporal causal graph (search, browse, moment detail)
 - **Flash** — reality-writing engine (generation, temporal navigation, character chat)
-- **Pro** — SNAG simulation engine (future)
 - **Proteus** — prediction markets (future)
 - **Billing** — tier resolution, credit metering, Stripe checkout
 
@@ -34,7 +33,7 @@ The MCP server never manages credits or subscriptions directly. Flash owns the c
 - `app/config.py` — Settings (env vars via pydantic-settings)
 - `app/auth/` — API key validation, OAuth 2.1 (future)
 - `app/billing/` — Credit check via Flash, tier check via Billing
-- `app/clients/` — HTTP clients for Flash, Clockchain, Billing, Pro
+- `app/clients/` — HTTP clients for Flash, Clockchain, Billing
 - `app/tools/` — MCP tool definitions (one file per service domain)
 - `PLAN.md` — Phased implementation plan
 - `AGENTS.md` — Ecosystem context for coding agents

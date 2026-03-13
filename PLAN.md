@@ -109,7 +109,7 @@
 - [ ] `app/billing/__init__.py`
 - [ ] `app/billing/credits.py`
   - `check_credits(user_id, cost)` — calls Flash balance, returns bool + balance
-  - Credit costs map: `{generate_balanced: 5, generate_hd: 10, generate_hyper: 5, chat: 1, temporal_jump: 2, simulation: 10}`
+  - Credit costs map: `{generate_balanced: 5, generate_hd: 10, generate_hyper: 5, chat: 1, temporal_jump: 2}`
   - Insufficient credit errors include balance, cost, and upgrade URL
 
 ### Step 2.4: Tier resolution
@@ -159,25 +159,11 @@
 
 ---
 
-## Phase 3: Pro Simulations + OAuth 2.1
+## Phase 3: OAuth 2.1
 
-**Goal:** 2 simulation tools, OAuth 2.1 for native MCP client auth.
+**Goal:** OAuth 2.1 for native MCP client auth.
 
-### Step 3.1: Pro client
-
-- [ ] `app/clients/pro.py` — `ProClient`
-  - `create_simulation(description, template, entity_count, temporal_mode)` → `POST /simulations/`
-  - `get_result(job_id)` → `GET /simulations/{job_id}/result`
-  - `list_templates()` → `GET /simulations/templates`
-
-### Step 3.2: Simulation tools
-
-- [ ] `app/tools/simulation.py` — 2 tools:
-  - `run_simulation(description, template, entity_count=3, temporal_mode="linear")` [10 credits]
-  - `get_simulation_result(job_id)`
-- [ ] Gate behind Explorer+ tier (free tier cannot access)
-
-### Step 3.3: OAuth 2.1
+### Step 3.1: OAuth 2.1
 
 - [ ] `app/auth/oauth.py`
 - [ ] Protected Resource Metadata at `/.well-known/oauth-protected-resource`
@@ -186,7 +172,7 @@
 - [ ] Token validation
 - [ ] Scoped access (read, generate, simulate)
 
-### Step 3.4: Key management web UI
+### Step 3.2: Key management web UI
 
 - [ ] Coordinate with web app team to add `/settings/keys` page
 - [ ] Web app calls MCP's `/account/keys` endpoints
@@ -250,9 +236,9 @@ Week 3:  Phase 2 (Steps 2.7 → 2.9)
          Deliverable: billing integration + Stripe checkout
 
 Week 4:  Phase 3 (Steps 3.1 → 3.2)
-         Deliverable: simulations working
+         Deliverable: OAuth 2.1 + key management UI
 
-Future:  Phase 3 OAuth + Phase 4
+Future:  Phase 4
 ```
 
 ---
