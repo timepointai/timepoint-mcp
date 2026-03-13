@@ -14,6 +14,7 @@
 - **Repo:** `timepointai/timepoint-mcp`
 - **Domain:** `mcp.timepointai.com`
 - **Framework:** FastMCP (Python) with Streamable HTTP transport
+
 ## Architecture
 
 This is an MCP (Model Context Protocol) server that provides AI agents access to the Timepoint ecosystem:
@@ -33,6 +34,7 @@ The MCP server never manages credits or subscriptions directly. Flash owns the c
 - `app/billing/` — Credit check via Flash, tier check via Billing
 - `app/clients/` — HTTP clients for Flash, Clockchain, Billing
 - `app/tools/` — MCP tool definitions (one file per service domain)
+
 ## Conventions
 
 - Commit style: `type: description` (feat:, fix:, chore:, docs:)
