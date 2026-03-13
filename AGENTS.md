@@ -14,18 +14,18 @@ This document provides the full context a coding agent needs to build and mainta
 │  │  MCP Server (this repo)          mcp.timepointai.com         │   │
 │  │  FastMCP + Streamable HTTP                                    │   │
 │  │  API key auth → tier resolution → credit check → tool exec   │   │
-│  └────┬──────────┬──────────┬──────────┬────────────────────────┘   │
-│       │          │          │          │                              │
-│       ▼          ▼          ▼          ▼                              │
-│  ┌─────────┐ ┌────────┐ ┌────────┐ ┌──────┐                        │
-│  │Clockchn │ │ Flash  │ │Billing │ │ Pro  │                        │
-│  │ Graph   │ │ Writer │ │ Stripe │ │ SNAG │                        │
-│  │ DB+API  │ │ 14-agt │ │ Apple  │ │ Sim  │                        │
-│  └─────────┘ └────────┘ └────────┘ └──────┘                        │
-│       │          │          │          │                              │
-│       └──────────┴──────────┘          │                              │
-│              shared PostgreSQL          │                              │
-│              (separate DBs)             │                              │
+│  └────┬──────────┬──────────┬───────────────────────────────────┘   │
+│       │          │          │                                        │
+│       ▼          ▼          ▼                                        │
+│  ┌─────────┐ ┌────────┐ ┌────────┐                                 │
+│  │Clockchn │ │ Flash  │ │Billing │                                 │
+│  │ Graph   │ │ Writer │ │ Stripe │                                 │
+│  │ DB+API  │ │ 14-agt │ │ Apple  │                                 │
+│  └─────────┘ └────────┘ └────────┘                                 │
+│       │          │          │                                        │
+│       └──────────┴──────────┘                                        │
+│              shared PostgreSQL                                       │
+│              (separate DBs)                                          │
 │                                                                      │
 │  Also: Proteus (prediction markets, future), TDF (data format lib), │
 │  SNAG-Bench (quality benchmarks), Landing (timepointai.com),         │
@@ -138,20 +138,6 @@ Manages Stripe + Apple IAP subscriptions and credit packs.
 - `status` in: `active`, `canceled`, `past_due`, `expired`
 - Only `active` counts as subscribed; all others = free tier for rate limit purposes
 
-### Pro (pro.timepointai.com)
-
-SNAG simulation engine. 19-mechanism pipeline.
-
-**Auth:** `X-API-Key: {PRO_API_KEY}`
-
-**Endpoints:**
-
-| Purpose | Method | Path |
-|---------|--------|------|
-| Run simulation | POST | `/simulations/` |
-| Get result | GET | `/simulations/{job_id}/result` |
-| List templates | GET | `/simulations/templates` |
-
 ---
 
 ## Data Flow for Key Operations
@@ -236,7 +222,6 @@ CREATE TABLE mcp_api_keys (
 | API keys | 1 | 3 | 10 | 25 |
 | Clockchain read | Yes | Yes | Yes | Yes |
 | Generation | Yes* | Yes | Yes | Yes |
-| Simulation | No | Yes | Yes | Yes |
 | SSE streaming | No | Yes | Yes | Yes |
 
 *Free tier can generate until credits run out (5 signup credits = 1 balanced generation).
@@ -270,8 +255,6 @@ CLOCKCHAIN_URL=<clockchain-url>
 CLOCKCHAIN_SERVICE_KEY=<clockchain-service-key>
 BILLING_URL=<billing-url>
 BILLING_SERVICE_KEY=<billing-service-key>
-PRO_URL=https://pro.timepointai.com
-PRO_API_KEY=<pro-api-key>
 
 # MCP server
 MCP_HOST=0.0.0.0
@@ -289,7 +272,6 @@ MCP_SIGNING_SECRET=<secret>
 | timepoint-flash | Main API + generation engine | github.com/timepointai/timepoint-flash |
 | timepoint-clockchain | Temporal causal graph | github.com/timepointai/timepoint-clockchain |
 | timepoint-billing | Stripe/Apple IAP billing | (private) |
-| timepoint-pro | SNAG simulation engine | github.com/timepointai/timepoint-pro |
 | timepoint-tdf | Data interchange format | github.com/timepointai/timepoint-tdf |
 | timepoint-web-app | Web frontend | (private) |
 | timepoint-iphone-app | iOS app | (private) |
