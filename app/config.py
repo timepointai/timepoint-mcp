@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -8,7 +7,7 @@ class Settings(BaseSettings):
     MCP_PORT: int = 8000
 
     # Downstream services
-    FLASH_URL: str = "https://api.timepointai.com"
+    FLASH_URL: str = "https://flash.timepointai.com"
     FLASH_SERVICE_KEY: str = ""
     FLASH_ADMIN_KEY: str = ""
 
@@ -17,9 +16,6 @@ class Settings(BaseSettings):
 
     BILLING_URL: str = ""
     BILLING_SERVICE_KEY: str = ""
-
-    PRO_URL: str = ""
-    PRO_API_KEY: str = ""
 
     # Auth & key store
     DATABASE_URL: str = ""
