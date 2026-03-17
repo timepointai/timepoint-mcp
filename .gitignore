@@ -11,3 +11,4 @@ venv/
 
 # Stoneforge
 .stoneforge/
+.DS_Store
