@@ -8,7 +8,10 @@ class Settings(BaseSettings):
 
     # Downstream services
     FLASH_URL: str = "https://flash.timepointai.com"
-    FLASH_SERVICE_KEY: str = ""
+    # FLASH_OUTBOUND_KEY is the key MCP sends to Flash as X-Service-Key.
+    # Falls back to legacy FLASH_SERVICE_KEY for backward compatibility.
+    FLASH_OUTBOUND_KEY: str = ""
+    FLASH_SERVICE_KEY: str = ""  # legacy alias — prefer FLASH_OUTBOUND_KEY
     FLASH_ADMIN_KEY: str = ""
 
     CLOCKCHAIN_URL: str = ""
@@ -33,6 +36,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_WRITE_EXPLORER: int = 10
     RATE_LIMIT_WRITE_CREATOR: int = 30
     RATE_LIMIT_WRITE_STUDIO: int = 100
+
+    @property
+    def flash_outbound_key(self) -> str:
+        """Key sent to Flash as X-Service-Key. Prefers FLASH_OUTBOUND_KEY, falls back to FLASH_SERVICE_KEY."""
+        return self.FLASH_OUTBOUND_KEY or self.FLASH_SERVICE_KEY
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

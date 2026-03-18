@@ -193,16 +193,16 @@ async def startup():
     # Clockchain client
     clockchain_client = ClockchainClient(
         flash_proxy_url=settings.FLASH_URL,
-        flash_service_key=settings.FLASH_SERVICE_KEY,
+        flash_service_key=settings.flash_outbound_key,
         direct_url=settings.CLOCKCHAIN_URL,
         direct_service_key=settings.CLOCKCHAIN_SERVICE_KEY,
     )
 
     # Flash client (for generation)
-    if settings.FLASH_URL and settings.FLASH_SERVICE_KEY:
+    if settings.FLASH_URL and settings.flash_outbound_key:
         flash_client = FlashClient(
             base_url=settings.FLASH_URL,
-            service_key=settings.FLASH_SERVICE_KEY,
+            service_key=settings.flash_outbound_key,
         )
         logger.info("Flash client initialized")
     else:
