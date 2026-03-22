@@ -9,6 +9,6 @@ venv/
 *.egg
 .pytest_cache/
 
-# Stoneforge
-.stoneforge/
+# Local
+.local/
 .DS_Store
