@@ -7,7 +7,7 @@
 - NEVER add any AI attribution, co-author tags, or tool attribution to commits
 - NEVER include emojis in commit messages
 - Commit messages should contain ONLY the commit description — nothing else
-- This applies to all commits across all timepoint-ai repositories
+- This applies to all commits across all timepointai repositories
 
 ## Project
 
