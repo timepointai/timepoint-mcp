@@ -8,11 +8,11 @@ MCP server for the [Timepoint AI](https://timepointai.com) temporal knowledge pl
 
 A hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI agents structured access to the Timepoint ecosystem:
 
-- **Search & browse** a causal graph of 196+ historical moments spanning 2000+ years
-- **Generate timepoints** — rich historical scenes with narratives, characters, dialog, and AI images (coming soon)
-- **Navigate time** — step forward/backward from any moment to discover what came before and after (coming soon)
-- **Chat with historical characters** — in-context conversations with period-appropriate personalities (coming soon)
-- **Run simulations** — multi-entity temporal scenarios via the SNAG engine (coming soon)
+- **Search & browse** a causal graph of 1,900+ historical moments and 5M+ edges spanning 700 BCE to 2026
+- **Generate timepoints** — rich historical scenes with narratives, characters, dialog, and AI images (Phase 2 — in development)
+- **Navigate time** — step forward/backward from any moment to discover what came before and after (Phase 2 — in development)
+- **Chat with historical characters** — in-context conversations with period-appropriate personalities (Phase 2 — in development)
+- **Run simulations** — multi-entity temporal scenarios via the SNAG engine (Phase 3 — planned)
 
 Works with Claude Desktop, Cursor, Windsurf, VS Code Copilot, the Anthropic Agent SDK, and any MCP-compatible client.
 
@@ -162,7 +162,7 @@ MCP Clients (Claude Desktop, Cursor, agents, SDKs)
  (graph)    (writer)   (Stripe/IAP)
 ```
 
-The MCP server is a thin coordination layer. It authenticates requests via API keys, resolves user tiers via Billing, checks credit balance via Flash, routes tool calls to the appropriate backend, and enforces per-tier rate limits. It never stores credits or subscriptions — Flash and Billing own those.
+The MCP server is a thin coordination layer. It authenticates requests via API keys, resolves user tiers via Billing, checks credit balance via the Gateway, routes tool calls to the appropriate backend, and enforces per-tier rate limits. It never stores credits or subscriptions — the Gateway and Billing own those.
 
 ## Tech stack
 
@@ -197,18 +197,18 @@ Render the past. Simulate the future. Score the predictions. Accumulate the grap
 
 | Service | Type | Repo | Role |
 |---------|------|------|------|
-| **Flash** | Open Source | timepoint-flash | Reality Writer — renders grounded historical moments |
-| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — Rendered Past + Rendered Future, growing 24/7 |
+| **API Gateway** | Private | timepoint-api-gateway | Auth authority — JWT, OAuth (Apple/Google/GitHub), credits, rate limiting at api.timepointai.com |
+| **Flash** | Open Source | timepoint-flash | Reality Writer — pure generation engine (no auth), renders grounded historical moments |
+| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — 1,900+ nodes, 5M+ edges, MCP endpoint, growing 24/7 |
 | **Pro** | Open Source | timepoint-pro | SNAG Simulation Engine — temporal simulation, TDF output, training data |
 | **Proteus** | Open Source | proteus | Settlement Layer — prediction markets for Rendered Futures |
 | **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
 | **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
 | **Billing** | Private | timepoint-billing | Payment Processing — Apple IAP + Stripe |
-| **MCP** | **Private** | **timepoint-mcp** | **MCP Server — AI agent access to Flash and Clockchain** |
+| **MCP** | **Public** | **timepoint-mcp** | **MCP Server — AI agent access to Flash and Clockchain** |
 | **Web App** | Private | timepoint-web-app | Browser client at app.timepointai.com |
 | **Landing** | Private | timepoint-landing | Marketing site at timepointai.com |
 | **iPhone App** | Private | timepoint-iphone-app | iOS client — Synthetic Time Travel on mobile |
-| **API Gateway** | Private | timepoint-api-gateway | Reverse proxy at api.timepointai.com |
 | **Skip Meetings** | Private | skipmeetingsai | Meeting intelligence SaaS powered by Flash |
 
 ## License
