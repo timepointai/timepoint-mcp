@@ -12,3 +12,6 @@ venv/
 # Local
 .local/
 .DS_Store
+
+# Claude Code
+.claude/
