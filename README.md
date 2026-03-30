@@ -8,7 +8,7 @@ MCP server for the [Timepoint AI](https://timepointai.com) temporal knowledge pl
 
 A hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI agents structured access to the Timepoint ecosystem:
 
-- **Search & browse** a causal graph of 1,900+ historical moments and 5M+ edges spanning 700 BCE to 2026
+- **Search & browse** a causal graph of 3,900+ historical moments and 5M+ edges spanning 700 BCE to 2026
 - **Generate timepoints** — rich historical scenes with narratives, characters, dialog, and AI images (Phase 2 — in development)
 - **Navigate time** — step forward/backward from any moment to discover what came before and after (Phase 2 — in development)
 - **Chat with historical characters** — in-context conversations with period-appropriate personalities (Phase 2 — in development)
@@ -199,7 +199,7 @@ Render the past. Simulate the future. Score the predictions. Accumulate the grap
 |---------|------|------|------|
 | **API Gateway** | Private | timepoint-api-gateway | Auth authority — JWT, OAuth (Apple/Google/GitHub), credits, rate limiting at api.timepointai.com |
 | **Flash** | Open Source | timepoint-flash | Reality Writer — pure generation engine (no auth), renders grounded historical moments |
-| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — 1,900+ nodes, 5M+ edges, MCP endpoint, growing 24/7 |
+| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — 3,900+ nodes, 5M+ edges, MCP endpoint, growing 24/7 |
 | **Pro** | Open Source | timepoint-pro | SNAG Simulation Engine — temporal simulation, TDF output, training data |
 | **Proteus** | Open Source | proteus | Settlement Layer — prediction markets for Rendered Futures |
 | **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
