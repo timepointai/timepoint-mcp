@@ -24,6 +24,7 @@ from app.auth.rate_limit import RateLimiter
 from app.clients.billing import BillingClient
 from app.clients.clockchain import ClockchainClient
 from app.clients.flash import FlashClient
+from app.clients.gateway import GatewayClient
 from app.config import get_settings
 from app.auth.tier import TierResolver
 from app.tools.clockchain import register_clockchain_tools
@@ -41,6 +42,7 @@ rate_limiter = RateLimiter()
 clockchain_client: ClockchainClient | None = None
 flash_client: FlashClient | None = None
 billing_client: BillingClient | None = None
+gateway_client: GatewayClient | None = None
 tier_resolver: TierResolver | None = None
 
 # --- MCP server ---
@@ -174,7 +176,7 @@ async def account_status(request: Request) -> JSONResponse:
 
 # --- Lifecycle ---
 async def startup():
-    global db_pool, key_store, clockchain_client, flash_client, billing_client, tier_resolver
+    global db_pool, key_store, clockchain_client, flash_client, billing_client, gateway_client, tier_resolver
     settings = get_settings()
 
     # Database
@@ -221,18 +223,31 @@ async def startup():
         tier_resolver = TierResolver(None)
         logger.warning("No Billing service key — tier resolution will default to free")
 
+    # Gateway client (credit operations — single source of truth)
+    if settings.GATEWAY_URL and settings.GATEWAY_SERVICE_KEY:
+        gateway_client = GatewayClient(
+            base_url=settings.GATEWAY_URL,
+            service_key=settings.GATEWAY_SERVICE_KEY,
+        )
+        logger.info("Gateway client initialized — credits routed through Gateway CreditAccount")
+    else:
+        gateway_client = None
+        logger.warning("No GATEWAY_URL/GATEWAY_SERVICE_KEY — credit operations will be unavailable")
+
     # Register tools
     register_clockchain_tools(mcp, clockchain_client)
-    register_clockchain_write_tools(mcp, clockchain_client, flash_client, key_store, rate_limiter)
+    register_clockchain_write_tools(mcp, clockchain_client, flash_client, key_store, rate_limiter, gateway_client)
     logger.info("Timepoint MCP server started (v%s)", VERSION)
 
 
 async def shutdown():
-    global db_pool, clockchain_client, flash_client, billing_client
+    global db_pool, clockchain_client, flash_client, billing_client, gateway_client
     if flash_client:
         await flash_client.close()
     if billing_client:
         await billing_client.close()
+    if gateway_client:
+        await gateway_client.close()
     if clockchain_client:
         await clockchain_client.close()
     if db_pool:

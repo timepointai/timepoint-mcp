@@ -13,9 +13,10 @@ from pydantic import Field
 
 from app.auth.keys import KeyInfo, KeyStore
 from app.auth.rate_limit import RateLimiter
-from app.billing.credits import COSTS, check_balance
+from app.billing.credits import COSTS, check_balance, spend_credits
 from app.clients.clockchain import ClockchainClient
 from app.clients.flash import FlashClient
+from app.clients.gateway import GatewayClient
 
 logger = logging.getLogger("mcp.tools.clockchain_write")
 
@@ -81,13 +82,14 @@ def register_clockchain_write_tools(
     flash_client: FlashClient | None,
     key_store: KeyStore | None,
     rate_limiter: RateLimiter,
+    gateway_client: GatewayClient | None = None,
 ):
     """Register clockchain write tools on the MCP server."""
 
     @mcp.tool()
     async def generate_moment(
         query: Annotated[str, Field(description="What historical event or moment to generate, e.g. 'Battle of Thermopylae' or 'First Moon Landing'")],
-        preset: Annotated[str, Field(description="Generation quality preset: 'balanced' (5 credits), 'hd' (10 credits), or 'hyper' (5 credits)")] = "balanced",
+        preset: Annotated[str, Field(description="Generation quality preset: 'balanced' (5 credits), 'hd' (10 credits), 'hyper' (5 credits), or 'gemini3' (5 credits)")] = "balanced",
         visibility: Annotated[str, Field(description="Visibility of the generated moment: 'private' (only you) or 'public'")] = "private",
         request=None,
     ) -> dict:
@@ -112,6 +114,10 @@ def register_clockchain_write_tools(
         if flash_client is None:
             return {"error": "Generation service not configured. Contact the server administrator."}
 
+        # Check Gateway client availability (required for credit operations)
+        if gateway_client is None:
+            return {"error": "Credit service not configured. Contact the server administrator."}
+
         # Validate preset
         if preset not in COSTS:
             return {"error": f"Invalid preset '{preset}'. Choose from: {list(COSTS.keys())}"}
@@ -121,11 +127,12 @@ def register_clockchain_write_tools(
 
         cost = COSTS[preset]
 
-        # Pre-check balance
-        has_enough, balance = await check_balance(flash_client, key_info.user_id, cost)
+        # Pre-check balance via Gateway (single source of truth)
+        has_enough, balance = await check_balance(gateway_client, key_info.user_id, cost)
         if not has_enough:
             return {
                 "error": f"Insufficient credits. Need {cost}, have {balance}.",
+                "status_code": 402,
                 "credits_required": cost,
                 "credits_available": balance,
                 "get_credits": "Visit https://timepointai.com to purchase credits.",
@@ -168,6 +175,23 @@ def register_clockchain_write_tools(
             index_result = {"error": f"Indexing failed: {e}. The moment was generated but may not appear in search yet."}
 
         latency_ms = int((time.monotonic() - start) * 1000)
+
+        # Deduct credits via Gateway (single source of truth)
+        spend_ok, balance_after = await spend_credits(
+            gateway_client,
+            user_id=key_info.user_id,
+            cost=cost,
+            transaction_type="generation",
+            description=f"MCP generate_moment preset={preset}",
+        )
+        if not spend_ok:
+            logger.error(
+                "Gateway credit spend failed for user %s after successful generation (cost=%d)",
+                key_info.user_id,
+                cost,
+            )
+            # Generation succeeded but credit deduction failed — still return
+            # result but log the discrepancy for reconciliation.
 
         # Log usage
         if key_store:

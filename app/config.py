@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     BILLING_URL: str = ""
     BILLING_SERVICE_KEY: str = ""
 
+    GATEWAY_URL: str = ""
+    GATEWAY_SERVICE_KEY: str = ""
+
     # Auth & key store
     DATABASE_URL: str = ""
     MCP_SIGNING_SECRET: str = ""
