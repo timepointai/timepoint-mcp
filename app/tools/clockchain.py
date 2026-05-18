@@ -156,4 +156,10 @@ def register_clockchain_tools(mcp, clockchain_client):
 
         Use this to understand the scope and coverage of the graph.
         """
-        return await clockchain_client.stats()
+        data = await clockchain_client.stats()
+        if isinstance(data, dict) and "total_nodes" in data and "total_moments" not in data:
+            # Alias total_nodes -> total_moments: in the Timepoint domain,
+            # graph nodes are historical moments. Clockchain uses "total_nodes"
+            # internally; expose "total_moments" as the canonical public field.
+            data = {**data, "total_moments": data["total_nodes"]}
+        return data
