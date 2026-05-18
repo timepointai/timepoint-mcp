@@ -263,9 +263,21 @@ def create_http_app() -> Starlette:
     to be active.  We compose our own startup/shutdown with the MCP app's lifespan by
     wrapping it: we run our init first, then delegate to mcp_app.lifespan, then our
     teardown.
+
+    Routing note: the FastMCP sub-app is built with ``path="/"`` and then mounted by
+    the parent Starlette app at ``/mcp``. When Starlette mounts a sub-app under a
+    prefix, that prefix is stripped before the sub-app sees the request — so a
+    request to ``/mcp/`` arrives at the sub-app as ``/``. If instead the sub-app
+    were built with ``path="/mcp"`` and mounted at ``/mcp``, the only URL that
+    would match would be ``/mcp/mcp`` (double-prefix bug, observed live: the MCP
+    Streamable HTTP handshake was 404ing at ``mcp.timepointai.com/mcp/`` and only
+    worked at ``/mcp/mcp`` — see task el-cg0zq / spec el-1w5ry).
     """
-    # Build the MCP sub-app once so we can reference its lifespan
-    mcp_app = mcp.http_app(path="/mcp")
+    # Build the MCP sub-app once so we can reference its lifespan.
+    # NOTE: path must be "/" because we mount this sub-app at "/mcp" below; the
+    # mount prefix is stripped before the sub-app routes, so the sub-app sees
+    # "/" for requests to "/mcp/".
+    mcp_app = mcp.http_app(path="/")
 
     @contextlib.asynccontextmanager
     async def lifespan(app):
@@ -286,7 +298,7 @@ def create_http_app() -> Starlette:
         lifespan=lifespan,
     )
 
-    # Mount MCP at /mcp
+    # Mount MCP at /mcp (sub-app's internal path is "/", so /mcp/ -> sub-app "/")
     app.mount("/mcp", mcp_app)
 
     return app
