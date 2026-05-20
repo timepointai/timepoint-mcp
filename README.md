@@ -9,10 +9,11 @@ MCP server for the [Timepoint AI](https://timepointai.com) temporal knowledge pl
 A hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI agents structured access to the Timepoint ecosystem:
 
 - **Search & browse** a causal graph of 3,900+ historical moments and 5M+ edges spanning 700 BCE to 2026
-- **Generate timepoints** — rich historical scenes with narratives, characters, dialog, and AI images (Phase 2 — in development)
-- **Navigate time** — step forward/backward from any moment to discover what came before and after (Phase 2 — in development)
-- **Chat with historical characters** — in-context conversations with period-appropriate personalities (Phase 2 — in development)
-- **Run simulations** — multi-entity temporal scenarios via the SNAG engine (Phase 3 — planned)
+- **Generate moments** — rich historical scenes rendered by the Flash reality-writing engine
+- **Publish moments** — promote your private moments into the public clockchain
+- **Index TDF records** — load pre-formatted Timepoint Data Format records directly (admin)
+
+Planned: temporal navigation, character chat, and multi-entity SNAG simulations.
 
 Works with Claude Desktop, Cursor, Windsurf, VS Code Copilot, the Anthropic Agent SDK, and any MCP-compatible client.
 
@@ -20,7 +21,7 @@ Works with Claude Desktop, Cursor, Windsurf, VS Code Copilot, the Anthropic Agen
 
 Visit [timepointai.com](https://timepointai.com) or reach out on [X @timepointai](https://x.com/timepointai) to request access.
 
-Clockchain read tools (search, browse, moment detail) work without authentication at 30 req/min. Generation and simulation tools require an API key and credits.
+Clockchain read tools (search, browse, moment detail) work without authentication, rate-limited at 30 req/min. Write tools require an API key with the appropriate scope, and generation also requires credits.
 
 ## Quick start
 
@@ -92,35 +93,35 @@ python -m app.server --transport http --port 8000
 
 ## Available tools
 
-### Phase 1 (live now) — Clockchain read tools
+### Clockchain read tools — live now
 
-| Tool | Auth | Description |
-|------|------|-------------|
-| `search_moments` | Optional | Search the temporal causal graph for historical events |
-| `get_moment` | Optional | Get full detail for a historical moment by its canonical path |
-| `browse_graph` | Optional | Browse the graph hierarchy — year, month, day, location, event |
-| `get_connections` | Optional | Get causal/thematic connections: what caused this, what it caused |
-| `today_in_history` | Key | Events that happened on today's date across all eras |
-| `random_moment` | Key | Random historical moment for serendipitous discovery |
-| `graph_stats` | Optional | Node/edge counts, date range, source distribution |
+No authentication required; anonymous callers are rate-limited.
 
-### Phase 2 (coming soon) — Generation tools
+| Tool | Description |
+|------|-------------|
+| `search_moments` | Search the temporal causal graph for historical events |
+| `get_moment` | Get full detail for a historical moment by its canonical path |
+| `browse_graph` | Browse the graph hierarchy — year, month, day, location, event |
+| `get_connections` | Get causal/thematic connections: what caused this, what it caused |
+| `today_in_history` | Events that happened on today's date across all eras |
+| `random_moment` | A random historical moment for serendipitous discovery |
+| `graph_stats` | Node/edge counts, date range, source distribution |
 
-| Tool | Credits | Description |
-|------|---------|-------------|
-| `generate_timepoint` | 5-10 | Generate a historical timepoint with scene, characters, dialog, image |
-| `temporal_navigate` | 2 | Step forward/backward in time from an existing timepoint |
-| `chat_with_character` | 1 | Converse with a historical character in context |
-| `get_timepoint` | 0 | Retrieve a previously generated timepoint |
-| `list_my_timepoints` | 0 | List your generated timepoints |
-| `get_credit_balance` | 0 | Check credits and usage |
+### Write tools — live now
 
-### Phase 3 (planned) — Simulation tools
+Require an API key with the listed scope.
 
-| Tool | Credits | Description |
-|------|---------|-------------|
-| `run_simulation` | 10 | Run a SNAG temporal simulation |
-| `get_simulation_result` | 0 | Get simulation results |
+| Tool | Scope | Credits | Description |
+|------|-------|---------|-------------|
+| `generate_moment` | `generate` | 5-10 | Generate a historical moment with Flash. Presets: `balanced` (5), `hd` (10), `hyper` (5), `gemini3` (5) |
+| `publish_moment` | `generate` | 0 | Publish one of your private moments into the public clockchain |
+| `index_moment_from_tdf` | `admin` | 0 | Index a pre-formatted TDF record directly into the clockchain |
+
+### Planned
+
+- **Temporal navigation** — step forward/backward in time from an existing moment
+- **Character chat** — converse with historical characters in context
+- **Simulations** — multi-entity temporal scenarios via the SNAG engine
 
 ## Pricing
 
@@ -132,7 +133,7 @@ python -m app.server --transport http --port 8000
 | Creator | $19.99/mo | 300 | 300 req/min |
 | Studio | $49.99/mo | 1,000 | 1,000 req/min |
 
-Credit packs also available as one-time purchases.
+Credit packs are also available as one-time purchases.
 
 ## HTTP endpoints
 
@@ -140,10 +141,10 @@ In addition to the MCP protocol at `/mcp`, the server exposes:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/` | Landing page (JSON for agents, redirect for browsers) |
+| GET | `/` | Landing page (JSON for agents, redirect to timepointai.com for browsers) |
 | GET | `/health` | Service health check |
-| GET | `/account/status` | Auth status and tier info |
-| POST | `/admin/create-key` | Create API key (requires admin key) |
+| GET | `/account/status` | Auth status and resolved tier |
+| POST | `/admin/create-key` | Create an API key (requires `X-Admin-Key`) |
 
 ## Architecture
 
@@ -155,18 +156,21 @@ MCP Clients (Claude Desktop, Cursor, agents, SDKs)
    timepoint-mcp (mcp.timepointai.com)
    FastMCP + Starlette + asyncpg
         |
-   -----+------+----------+
-   |           |           |
-   v           v           v
- Clockchain  Flash      Billing
- (graph)    (writer)   (Stripe/IAP)
+   -----+----------+-------------+----------+
+   |               |             |          |
+   v               v             v          v
+ Clockchain      Flash      API Gateway   Billing
+ (graph)        (writer)     (credits)    (tiers)
 ```
 
-The MCP server is a thin coordination layer. It authenticates requests via API keys, resolves user tiers via Billing, checks credit balance via the Gateway, routes tool calls to the appropriate backend, and enforces per-tier rate limits. It never stores credits or subscriptions — the Gateway and Billing own those.
+The MCP server is a thin coordination layer. It authenticates requests via API keys,
+resolves user tiers via Billing, checks and spends credits via the API Gateway,
+routes tool calls to the appropriate backend, and enforces per-tier rate limits. It
+never stores credits or subscriptions — the Gateway and Billing own those.
 
 ## Tech stack
 
-- **Python 3.11+** with FastMCP, Starlette, httpx, asyncpg
+- **Python 3.11+** with FastMCP, Starlette, httpx, asyncpg, uvicorn
 - **Transport:** Streamable HTTP (production), stdio (local dev)
 - **Database:** PostgreSQL (API keys + usage logs)
 - **Deployment:** Railway (Docker)
@@ -175,19 +179,23 @@ The MCP server is a thin coordination layer. It authenticates requests via API k
 
 ```bash
 # Downstream services
-FLASH_URL=https://api.timepointai.com
-FLASH_OUTBOUND_KEY=...  # key sent to Flash as X-Service-Key (was FLASH_SERVICE_KEY)
-FLASH_ADMIN_KEY=...
+FLASH_URL=https://flash.timepointai.com
+FLASH_OUTBOUND_KEY=...        # key sent to Flash as X-Service-Key (legacy alias: FLASH_SERVICE_KEY)
+FLASH_ADMIN_KEY=...           # admin key gating POST /admin/create-key
 CLOCKCHAIN_URL=...
 CLOCKCHAIN_SERVICE_KEY=...
 BILLING_URL=...
 BILLING_SERVICE_KEY=...
+GATEWAY_URL=...               # API Gateway — owns the credit ledger
+GATEWAY_SERVICE_KEY=...
 
 # Database
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql://...  # API keys + usage logs; runs anonymous-only if unset
 
 # Server
-PORT=8000
+PORT=8000                      # honored by the Docker CMD (Railway sets this)
+MCP_HOST=0.0.0.0               # defaults to 0.0.0.0; MCP_PORT defaults to 8000
+MCP_SIGNING_SECRET=...         # request-signing secret
 ```
 
 
