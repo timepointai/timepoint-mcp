@@ -20,25 +20,29 @@
 This is an MCP (Model Context Protocol) server that provides AI agents access to the Timepoint ecosystem:
 
 - **Clockchain** — temporal causal graph (search, browse, moment detail)
-- **Flash** — reality-writing engine (generation, temporal navigation, character chat)
-- **Proteus** — prediction markets (future)
-- **Billing** — tier resolution, credit metering, Stripe checkout
+- **Flash** — reality-writing engine (moment generation)
+- **API Gateway** — credit ledger (CreditAccount); all credit checks and spends route here
+- **Billing** — subscription tier resolution
 
-The MCP server never manages credits or subscriptions directly. Flash owns the credit ledger. Billing owns subscription state. The MCP server checks both and enforces rate limits per tier.
+The MCP server never manages credits or subscriptions directly. The API Gateway owns
+the credit ledger — every credit check and spend goes through the Gateway's
+CreditAccount. Billing owns subscription state. The MCP server queries both and
+enforces rate limits per tier.
 
 ## Key Files
 
-- `app/server.py` — FastMCP server init, transport config
+- `app/server.py` — FastMCP init, Starlette HTTP app, transport config, startup/shutdown lifecycle
+- `app/__main__.py` — module entry point (`python -m app`)
 - `app/config.py` — Settings (env vars via pydantic-settings)
-- `app/auth/` — API key validation, OAuth 2.1 (future)
-- `app/billing/` — Credit check via Flash, tier check via Billing
-- `app/clients/` — HTTP clients for Flash, Clockchain, Billing
-- `app/tools/` — MCP tool definitions (one file per service domain)
+- `app/auth/` — API key validation (`keys.py`), per-tier rate limiting (`rate_limit.py`), tier resolution (`tier.py`)
+- `app/billing/credits.py` — credit cost map plus balance checks and spends via the Gateway
+- `app/clients/` — HTTP clients for Flash, Clockchain, Billing, and the API Gateway
+- `app/tools/` — MCP tool definitions (`clockchain.py` read tools, `clockchain_write.py` write tools)
 
 ## Conventions
 
 - Commit style: `type: description` (feat:, fix:, chore:, docs:)
-- Python 3.12+, Pydantic v2, async throughout
+- Python 3.11+, Pydantic v2, async throughout
 - All tool handlers are async functions decorated with `@mcp.tool()`
-- All downstream calls use httpx async client
+- All downstream calls use the httpx async client
 - Tool descriptions are written for LLM consumption — be specific about when/why to use each tool
