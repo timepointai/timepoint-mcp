@@ -208,7 +208,7 @@ Render the past. Simulate the future. Score the predictions. Accumulate the grap
 | **API Gateway** | Private | timepoint-api-gateway | Auth authority — JWT, OAuth (Apple/Google/GitHub), credits, rate limiting at api.timepointai.com |
 | **Flash** | Open Source | timepoint-flash | Reality Writer — pure generation engine (no auth), renders grounded historical moments |
 | **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — 3,900+ nodes, 5M+ edges, MCP endpoint, growing 24/7 |
-| **Pro** | Open Source | timepoint-pro | SNAG Simulation Engine — temporal simulation, TDF output, training data |
+| **Pro** | Closed / Hosted API | pro.timepointai.com | SNAG Simulation Engine — hosted temporal simulation, TDF output |
 | **Proteus** | Open Source | proteus | Settlement Layer — prediction markets for Rendered Futures |
 | **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
 | **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
