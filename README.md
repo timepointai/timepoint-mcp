@@ -8,7 +8,7 @@ MCP server for the [Timepoint AI](https://timepointai.com) temporal knowledge pl
 
 A hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI agents structured access to the Timepoint ecosystem:
 
-- **Search & browse** a causal graph of 3,900+ historical moments and 5M+ edges spanning 700 BCE to 2026
+- **Search & browse** a continuously growing temporal causal graph of historical moments spanning 700 BCE to 2026
 - **Generate moments** — rich historical scenes rendered by the Flash reality-writing engine
 - **Publish moments** — promote your private moments into the public clockchain
 - **Index TDF records** — load pre-formatted Timepoint Data Format records directly (admin)
@@ -205,19 +205,12 @@ Render the past. Simulate the future. Score the predictions. Accumulate the grap
 
 | Service | Type | Repo | Role |
 |---------|------|------|------|
-| **API Gateway** | Private | timepoint-api-gateway | Auth authority — JWT, OAuth (Apple/Google/GitHub), credits, rate limiting at api.timepointai.com |
 | **Flash** | Open Source | timepoint-flash | Reality Writer — pure generation engine (no auth), renders grounded historical moments |
-| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — 3,900+ nodes, 5M+ edges, MCP endpoint, growing 24/7 |
-| **Pro** | Closed / Hosted API | pro.timepointai.com | SNAG Simulation Engine — hosted temporal simulation, TDF output |
+| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — a continuously growing temporal causal graph with an MCP endpoint |
 | **Proteus** | Open Source | proteus | Settlement Layer — prediction markets for Rendered Futures |
 | **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
 | **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
-| **Billing** | Private | timepoint-billing | Payment Processing — Apple IAP + Stripe |
 | **MCP** | **Public** | **timepoint-mcp** | **MCP Server — AI agent access to Flash and Clockchain** |
-| **Web App** | Private | timepoint-web-app | Browser client at app.timepointai.com |
-| **Landing** | Private | timepoint-landing | Marketing site at timepointai.com |
-| **iPhone App** | Private | timepoint-iphone-app | iOS client — Synthetic Time Travel on mobile |
-| **Skip Meetings** | Private | skipmeetingsai | Meeting intelligence SaaS powered by Flash |
 
 ## License
 
