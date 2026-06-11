@@ -41,6 +41,32 @@ class ClockchainClient:
     def _direct_base(self) -> str:
         return f"{self.direct_url}/api/v1" if self.direct_url else self._proxy_base()
 
+    def _read_base(self) -> str:
+        """Base URL for read tools (search/browse/today/random/neighbors/get_moment/stats).
+
+        These hit Clockchain's own ``/api/v1/*`` endpoints directly via
+        ``CLOCKCHAIN_URL``. There is NO ``/api/v1/clockchain/*`` read proxy on
+        Flash — that path 404s — so the legacy proxy is only a last-resort
+        fallback when CLOCKCHAIN_URL is unconfigured.
+        """
+        return self._direct_base()
+
+    def _read_headers(self, user_id: str | None = None) -> dict:
+        """Headers for direct Clockchain reads.
+
+        Sends ``X-Service-Key`` (CLOCKCHAIN_SERVICE_KEY) so service-key-gated
+        endpoints (browse/today/random/neighbors) authenticate. Falls back to
+        the Flash outbound key when reads are routed through the proxy base
+        (CLOCKCHAIN_URL unset).
+        """
+        if self.direct_url:
+            h = dict(self._direct_headers())
+        else:
+            h = dict(self._proxy_headers())
+        if user_id:
+            h["X-User-ID"] = user_id
+        return h
+
     async def _get(self, url: str, headers: dict, params: dict | None = None) -> dict | list:
         resp = await self._client.get(url, headers=headers, params=params)
         if resp.status_code == 404:
@@ -63,59 +89,56 @@ class ClockchainClient:
         return resp.json()
 
     async def search(self, query: str, limit: int = 20, user_id: str | None = None) -> list:
-        """Search moments. Uses Flash proxy (requires service key for search endpoint)."""
-        url = f"{self._proxy_base()}/search"
-        data = await self._get(url, self._proxy_headers(user_id), params={"q": query})
+        """Search moments directly against Clockchain's public /api/v1/search.
+
+        The Clockchain search endpoint caps limit at 50 (``le=50``); clamp here so
+        a larger MCP-side request doesn't 422 the upstream call.
+        """
+        url = f"{self._read_base()}/search"
+        capped = min(max(limit, 1), 50)
+        data = await self._get(url, self._read_headers(user_id), params={"q": query, "limit": capped})
         if isinstance(data, list):
             return data[:limit]
+        if isinstance(data, dict) and "error" in data:
+            return data
         return data.get("items", data.get("results", []))[:limit]
 
     async def get_moment(self, path: str, format: str = "default") -> dict:
-        """Get moment detail. Uses public endpoint when available."""
+        """Get moment detail from Clockchain /api/v1/moments/{path}."""
         clean_path = path.strip("/")
-        base = self._direct_base()
-        url = f"{base}/moments/{clean_path}"
+        url = f"{self._read_base()}/moments/{clean_path}"
         params = {"format": format} if format != "default" else None
-        headers = self._direct_headers()
-        # Try direct first (public), fall back to proxy
-        try:
-            return await self._get(url, headers, params)
-        except httpx.HTTPStatusError:
-            if self.direct_url:
-                url = f"{self._proxy_base()}/moments/{clean_path}"
-                return await self._get(url, self._proxy_headers(), params)
-            raise
+        return await self._get(url, self._read_headers(), params)
 
     async def browse(self, path: str = "") -> dict:
-        """Browse graph hierarchy. Requires service key."""
+        """Browse graph hierarchy via Clockchain /api/v1/browse. Requires service key."""
         clean_path = path.strip("/")
         if clean_path:
-            url = f"{self._proxy_base()}/browse/{clean_path}"
+            url = f"{self._read_base()}/browse/{clean_path}"
         else:
-            url = f"{self._proxy_base()}/browse"
-        return await self._get(url, self._proxy_headers())
+            url = f"{self._read_base()}/browse"
+        return await self._get(url, self._read_headers())
 
     async def neighbors(self, path: str) -> dict:
-        """Get graph neighbors. Requires service key."""
+        """Get graph neighbors via Clockchain /api/v1/graph/neighbors. Requires service key."""
         clean_path = path.strip("/")
-        url = f"{self._proxy_base()}/graph/neighbors/{clean_path}"
-        return await self._get(url, self._proxy_headers())
+        url = f"{self._read_base()}/graph/neighbors/{clean_path}"
+        return await self._get(url, self._read_headers())
 
     async def today(self) -> dict:
-        """Today in history. Requires service key."""
-        url = f"{self._proxy_base()}/today"
-        return await self._get(url, self._proxy_headers())
+        """Today in history via Clockchain /api/v1/today. Requires service key."""
+        url = f"{self._read_base()}/today"
+        return await self._get(url, self._read_headers())
 
     async def random(self) -> dict:
-        """Random public moment. Requires service key."""
-        url = f"{self._proxy_base()}/random"
-        return await self._get(url, self._proxy_headers())
+        """Random public moment via Clockchain /api/v1/random. Requires service key."""
+        url = f"{self._read_base()}/random"
+        return await self._get(url, self._read_headers())
 
     async def stats(self) -> dict:
-        """Graph stats. Public endpoint."""
-        base = self._direct_base()
-        url = f"{base}/stats"
-        return await self._get(url, self._direct_headers())
+        """Graph stats via Clockchain /api/v1/stats. Public endpoint."""
+        url = f"{self._read_base()}/stats"
+        return await self._get(url, self._read_headers())
 
     async def index_moment(self, payload: dict, user_id: str) -> dict:
         """Index a new moment into the clockchain.
