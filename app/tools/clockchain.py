@@ -11,6 +11,21 @@ from pydantic import Field
 
 logger = logging.getLogger("mcp.tools.clockchain")
 
+VALID_EDGE_TYPES = {
+    "causes", "caused_by", "influences", "contemporaneous", "same_era",
+    "same_location", "same_conflict", "same_figure", "thematic",
+    "precedes", "follows", "challenges",
+}
+
+VALID_DIRECTIONS = {"past", "future", "both"}
+
+
+def _invalid_edge_types(edge_types: str | None) -> list[str]:
+    """Return any CSV tokens that are not valid Clockchain edge types."""
+    if not edge_types:
+        return []
+    return [t.strip() for t in edge_types.split(",") if t.strip() and t.strip() not in VALID_EDGE_TYPES]
+
 
 def register_clockchain_tools(mcp, clockchain_client):
     """Register all Clockchain read tools on the MCP server."""
@@ -125,6 +140,98 @@ def register_clockchain_tools(mcp, clockchain_client):
         result = await clockchain_client.neighbors(path.strip("/"))
         if isinstance(result, dict) and "error" in result:
             return {"error": "Moment not found.", "suggestion": f"Verify the path with get_moment first. Path tried: {path}"}
+        return result
+
+    @mcp.tool()
+    async def traverse_moments(
+        path: Annotated[str, Field(description="Canonical path of the anchor moment, e.g. '/1914/june/28/1030/bosnia/sarajevo/assassination-of-franz-ferdinand'. Get paths from search_moments or browse_graph.")],
+        direction: Annotated[str, Field(description="Temporal direction to walk: 'past' (what led to this), 'future' (what this led to), or 'both'")] = "both",
+        depth: Annotated[int, Field(description="How many hops to walk from the anchor (1-4). Depth 1 equals get_connections; 2-3 reveals chains; 4 maps a whole neighborhood.", ge=1, le=4)] = 2,
+        edge_types: Annotated[str | None, Field(description="Comma-separated edge types to follow. Default: causes,caused_by,precedes,follows,influences (the causal core). Add contemporaneous, same_era, same_location, same_conflict, same_figure, thematic, or challenges to widen the walk.")] = None,
+        limit: Annotated[int, Field(description="Max nodes to return (1-200). The response sets truncated=true if this clipped the walk.", ge=1, le=200)] = 50,
+    ) -> dict:
+        """Walk the causal graph N hops from a moment to map its causes and consequences.
+
+        Where get_connections shows only direct neighbors (1 hop), this tool follows
+        chains of connections outward — e.g. anchor -> what it caused -> what THAT
+        caused — returning a subgraph of nodes (each tagged with its 'hop' distance
+        from the anchor) and the edges linking them.
+
+        Use this when the user asks about ripple effects, root causes, chains of
+        events, or "how did X lead to Y" style questions:
+        - traverse_moments(path, direction="past", depth=3) — trace root causes
+        - traverse_moments(path, direction="future", depth=3) — trace downstream consequences
+        - traverse_moments(path, edge_types="causes,caused_by") — strict causality only
+
+        Returns {anchor, direction, depth, nodes[], edges[], node_count, edge_count,
+        truncated}. Nodes carry name/year/era/location and hop (0 = the anchor).
+        For a single moment's direct links, prefer get_connections; to connect two
+        specific moments, prefer find_path.
+        """
+        if direction not in VALID_DIRECTIONS:
+            return {
+                "error": f"Invalid direction '{direction}'.",
+                "suggestion": "Use 'past', 'future', or 'both'.",
+            }
+        bad_types = _invalid_edge_types(edge_types)
+        if bad_types:
+            return {
+                "error": f"Invalid edge_types: {', '.join(bad_types)}.",
+                "suggestion": f"Valid types: {', '.join(sorted(VALID_EDGE_TYPES))}.",
+            }
+        try:
+            result = await clockchain_client.traverse(
+                path, direction=direction, depth=depth, edge_types=edge_types, limit=limit
+            )
+        except Exception as e:
+            logger.warning("traverse_moments failed for %s: %s", path, e)
+            return {
+                "error": "Clockchain traverse request failed.",
+                "suggestion": "Try again, or reduce depth/limit if the request was large.",
+            }
+        if isinstance(result, dict) and "error" in result:
+            return {
+                "error": "Anchor moment not found.",
+                "suggestion": f"Use search_moments or browse_graph to find a valid path. Path tried: {path}",
+            }
+        return result
+
+    @mcp.tool()
+    async def find_path(
+        from_path: Annotated[str, Field(description="Canonical path of the starting moment")],
+        to_path: Annotated[str, Field(description="Canonical path of the destination moment")],
+        max_hops: Annotated[int, Field(description="Max connections to cross before giving up (1-10). More hops finds longer chains but weaker relationships.", ge=1, le=10)] = 6,
+    ) -> dict:
+        """Find the shortest chain of historical connections linking two moments.
+
+        Use this when the user asks how two events are related, e.g. "how does the
+        assassination of Franz Ferdinand connect to the Treaty of Versailles?".
+        The graph is searched in both directions across causal and thematic edges,
+        and the first shortest path is returned as an ordered walk: nodes[] from
+        the start moment to the destination (hop = position along the path) plus
+        the edges[] crossed, each with a type and a description explaining why the
+        two moments are linked.
+
+        Returns {found, from, to, hops, nodes[], edges[]}. found=false means the
+        moments exist but no chain connects them within max_hops — try raising
+        max_hops before concluding they are unrelated. An error is returned only
+        when one of the two paths does not exist in the graph.
+
+        To explore outward from a single moment instead, use traverse_moments.
+        """
+        try:
+            result = await clockchain_client.path(from_path, to_path, max_hops=max_hops)
+        except Exception as e:
+            logger.warning("find_path failed for %s -> %s: %s", from_path, to_path, e)
+            return {
+                "error": "Clockchain path request failed.",
+                "suggestion": "Try again, or lower max_hops if the request was large.",
+            }
+        if isinstance(result, dict) and "error" in result:
+            return {
+                "error": "One or both moments were not found.",
+                "suggestion": f"Verify both paths with get_moment or search_moments. Tried: {from_path} -> {to_path}",
+            }
         return result
 
     @mcp.tool()
