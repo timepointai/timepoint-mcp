@@ -9,6 +9,8 @@ from typing import Annotated
 
 from pydantic import Field
 
+from app.config import get_settings
+
 logger = logging.getLogger("mcp.tools.clockchain")
 
 VALID_EDGE_TYPES = {
@@ -232,6 +234,51 @@ def register_clockchain_tools(mcp, clockchain_client):
                 "error": "One or both moments were not found.",
                 "suggestion": f"Verify both paths with get_moment or search_moments. Tried: {from_path} -> {to_path}",
             }
+        return result
+
+    @mcp.tool()
+    async def explore_graph(
+        path: Annotated[str, Field(description="Canonical path of the root moment, e.g. '/1914/june/28/1030/bosnia/sarajevo/assassination-of-franz-ferdinand'. Get paths from search_moments or browse_graph.")],
+        depth: Annotated[int, Field(description="Hop radius around the root (1-3). 1 = direct neighborhood; 3 = wide local map.", ge=1, le=3)] = 1,
+        cap: Annotated[int, Field(description="Max nodes to return (1-200). The strongest-weighted connections are kept first; meta.truncated=true means the cap clipped the neighborhood.", ge=1, le=200)] = 100,
+    ) -> dict:
+        """Agent-native view of the live Explore instrument: a bounded induced subgraph around a moment.
+
+        Returns the same neighborhood the interactive Explore page renders —
+        nodes (each tagged with its 'hop' distance from the root) plus ALL edges
+        among them (the full induced subgraph, not just a spanning tree), ranked
+        by edge weight and causal priority when the cap forces truncation.
+
+        The response includes a web_url deep link to share with the user so they
+        can open the same subgraph in the live Explore instrument in their
+        browser and keep navigating visually.
+
+        Use this when the user wants an overview map around one moment; for
+        directional cause/effect walks use traverse_moments, and to connect two
+        specific moments use find_path.
+
+        Returns {nodes[], edges[], meta:{root, depth, cap, truncated, counts},
+        web_url}.
+        """
+        # Clamp defensively (mirrors the client clamps) so the web_url deep
+        # link always carries the depth actually requested upstream.
+        depth = min(max(depth, 1), 3)
+        cap = min(max(cap, 1), 200)
+        try:
+            result = await clockchain_client.subgraph(path, depth=depth, cap=cap)
+        except Exception as e:
+            logger.warning("explore_graph failed for %s: %s", path, e)
+            return {
+                "error": "Clockchain subgraph request failed.",
+                "suggestion": "Try again, or reduce depth/cap if the request was large.",
+            }
+        if isinstance(result, dict) and "error" in result:
+            return {
+                "error": "Moment not found.",
+                "suggestion": f"Use search_moments or browse_graph to find a valid path. Path tried: {path}",
+            }
+        web_app_url = get_settings().WEB_APP_URL.rstrip("/")
+        result["web_url"] = f"{web_app_url}/explore/{path.strip('/')}?depth={depth}"
         return result
 
     @mcp.tool()

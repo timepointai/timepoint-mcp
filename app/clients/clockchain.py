@@ -125,6 +125,21 @@ class ClockchainClient:
         url = f"{self._read_base()}/graph/neighbors/{clean_path}"
         return await self._get(url, self._read_headers())
 
+    async def subgraph(self, path: str, depth: int = 1, cap: int = 200) -> dict:
+        """Bounded induced subgraph via Clockchain /api/v1/graph/subgraph. Requires service key.
+
+        Clamps depth to 1..3 and cap to 1..200 client-side so oversized MCP
+        requests don't 422 the upstream call (upstream caps are depth 3 /
+        cap 500; we keep MCP payloads smaller).
+        """
+        clean_path = path.strip("/")
+        url = f"{self._read_base()}/graph/subgraph/{clean_path}"
+        params = {
+            "depth": min(max(depth, 1), 3),
+            "cap": min(max(cap, 1), 200),
+        }
+        return await self._get(url, self._read_headers(), params)
+
     async def traverse(
         self,
         path: str,
