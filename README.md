@@ -9,11 +9,12 @@ MCP server for the [Timepoint AI](https://timepointai.com) temporal knowledge pl
 A hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI agents structured access to the Timepoint ecosystem:
 
 - **Search & browse** a continuously growing temporal causal graph of historical moments spanning 700 BCE to 2026
+- **Navigate time** — walk the causal graph multi-hop from any moment, or find the shortest chain of connections between two moments
 - **Generate moments** — rich historical scenes rendered by the Flash reality-writing engine
 - **Publish moments** — promote your private moments into the public clockchain
 - **Index TDF records** — load pre-formatted Timepoint Data Format records directly (admin)
 
-Planned: temporal navigation, character chat, and multi-entity SNAG simulations.
+Planned: character chat and multi-entity SNAG simulations.
 
 Works with Claude Desktop, Cursor, Windsurf, VS Code Copilot, the Anthropic Agent SDK, and any MCP-compatible client.
 
@@ -103,9 +104,53 @@ No authentication required; anonymous callers are rate-limited.
 | `get_moment` | Get full detail for a historical moment by its canonical path |
 | `browse_graph` | Browse the graph hierarchy — year, month, day, location, event |
 | `get_connections` | Get causal/thematic connections: what caused this, what it caused |
+| `traverse_moments` | Walk the causal graph N hops from a moment to map its causes and consequences |
+| `find_path` | Find the shortest chain of historical connections linking two moments |
 | `today_in_history` | Events that happened on today's date across all eras |
 | `random_moment` | A random historical moment for serendipitous discovery |
 | `graph_stats` | Node/edge counts, date range, source distribution |
+
+#### Temporal navigation
+
+`traverse_moments` runs a multi-hop BFS from an anchor moment. Where `get_connections`
+shows direct neighbors only, this follows chains of connections outward and returns a
+subgraph with each node tagged by its hop distance from the anchor:
+
+```json
+{
+  "name": "traverse_moments",
+  "arguments": {
+    "path": "/1914/june/28/1030/bosnia/sarajevo/assassination-of-franz-ferdinand",
+    "direction": "future",
+    "depth": 3,
+    "edge_types": "causes,caused_by,precedes,follows,influences",
+    "limit": 50
+  }
+}
+```
+
+Returns `{anchor, direction, depth, nodes[], edges[], node_count, edge_count, truncated}` —
+nodes carry `hop` (0 = anchor), edges carry `type`, `weight`, and a `description` of why
+the two moments are linked. `direction` is `past`, `future`, or `both`; depth is capped at
+4 and limit at 200.
+
+`find_path` finds the shortest chain of connections between two moments (bidirectional
+search, edges treated as undirected):
+
+```json
+{
+  "name": "find_path",
+  "arguments": {
+    "from_path": "/1914/june/28/1030/bosnia/sarajevo/assassination-of-franz-ferdinand",
+    "to_path": "/1919/june/28/1500/france/versailles/treaty-of-versailles",
+    "max_hops": 6
+  }
+}
+```
+
+Returns `{found, from, to, hops, nodes[], edges[]}` with nodes ordered from start to
+destination. `found: false` means no chain exists within `max_hops` (capped at 10) —
+the moments themselves exist.
 
 ### Write tools — live now
 
@@ -119,7 +164,6 @@ Require an API key with the listed scope.
 
 ### Planned
 
-- **Temporal navigation** — step forward/backward in time from an existing moment
 - **Character chat** — converse with historical characters in context
 - **Simulations** — multi-entity temporal scenarios via the SNAG engine
 
