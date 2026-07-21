@@ -7,9 +7,7 @@ via the Model Context Protocol (MCP).
 import argparse
 import contextlib
 import hmac
-import json
 import logging
-import sys
 
 import asyncpg
 import uvicorn
@@ -97,7 +95,8 @@ async def root(request: Request) -> JSONResponse:
         },
         "free_tools": [
             "search_moments", "get_moment", "browse_graph",
-            "get_connections", "today_in_history", "random_moment", "graph_stats",
+            "get_connections", "traverse_moments", "find_path",
+            "today_in_history", "random_moment", "graph_stats",
         ],
         "authenticated_tools": [
             "generate_moment (generate scope, 5-10 credits)",

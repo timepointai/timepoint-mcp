@@ -125,6 +125,70 @@ class ClockchainClient:
         url = f"{self._read_base()}/graph/neighbors/{clean_path}"
         return await self._get(url, self._read_headers())
 
+    async def subgraph(self, path: str, depth: int = 1, cap: int = 200) -> dict:
+        """Bounded induced subgraph via Clockchain /api/v1/graph/subgraph. Requires service key.
+
+        Clamps depth to 1..3 and cap to 1..200 client-side so oversized MCP
+        requests don't 422 the upstream call (upstream caps are depth 3 /
+        cap 500; we keep MCP payloads smaller).
+        """
+        clean_path = path.strip("/")
+        url = f"{self._read_base()}/graph/subgraph/{clean_path}"
+        params = {
+            "depth": min(max(depth, 1), 3),
+            "cap": min(max(cap, 1), 200),
+        }
+        return await self._get(url, self._read_headers(), params)
+
+    async def traverse(
+        self,
+        path: str,
+        direction: str = "both",
+        depth: int = 2,
+        edge_types: str | None = None,
+        limit: int = 50,
+        min_weight: float = 0.0,
+    ) -> dict:
+        """Multi-hop BFS subgraph via Clockchain /api/v1/graph/traverse. Requires service key.
+
+        Clamps depth to 1..4 and limit to 1..200 client-side so oversized MCP
+        requests don't 422 the upstream call (upstream caps are depth 4 /
+        limit 500; we keep MCP payloads smaller).
+        """
+        clean_path = path.strip("/")
+        url = f"{self._read_base()}/graph/traverse/{clean_path}"
+        params = {
+            "direction": direction,
+            "depth": min(max(depth, 1), 4),
+            "limit": min(max(limit, 1), 200),
+        }
+        if edge_types:
+            params["edge_types"] = edge_types
+        if min_weight:
+            params["min_weight"] = min_weight
+        return await self._get(url, self._read_headers(), params)
+
+    async def path(
+        self,
+        from_path: str,
+        to_path: str,
+        max_hops: int = 6,
+        edge_types: str | None = None,
+    ) -> dict:
+        """Shortest connection path via Clockchain /api/v1/graph/path. Requires service key.
+
+        Clamps max_hops to 1..10 client-side (upstream cap is 10).
+        """
+        url = f"{self._read_base()}/graph/path"
+        params = {
+            "from": from_path.strip("/"),
+            "to": to_path.strip("/"),
+            "max_hops": min(max(max_hops, 1), 10),
+        }
+        if edge_types:
+            params["edge_types"] = edge_types
+        return await self._get(url, self._read_headers(), params)
+
     async def today(self) -> dict:
         """Today in history via Clockchain /api/v1/today. Requires service key."""
         url = f"{self._read_base()}/today"

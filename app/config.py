@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     GATEWAY_URL: str = ""
     GATEWAY_SERVICE_KEY: str = ""
 
+    # Public web app — used to build shareable deep links (e.g. /explore/{path})
+    WEB_APP_URL: str = "https://app.timepointai.com"
+
     # Auth & key store
     DATABASE_URL: str = ""
     MCP_SIGNING_SECRET: str = ""
