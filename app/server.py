@@ -7,6 +7,7 @@ via the Model Context Protocol (MCP).
 import argparse
 import contextlib
 import hmac
+import json
 import logging
 
 import asyncpg
@@ -93,17 +94,17 @@ async def root(request: Request) -> JSONResponse:
             "website": "https://timepointai.com",
             "twitter": "https://x.com/timepointai",
         },
-        "free_tools": [
+        "read_tools": [
             "search_moments", "get_moment", "browse_graph",
             "get_connections", "traverse_moments", "find_path",
             "today_in_history", "random_moment", "graph_stats",
         ],
-        "authenticated_tools": [
+        "write_tools": [
             "generate_moment (generate scope, 5-10 credits)",
             "publish_moment (generate scope, 0 credits)",
             "index_moment_from_tdf (admin scope, 0 credits)",
         ],
-        "note": "Clockchain read tools work without authentication (rate-limited). Write tools require an API key with appropriate scopes and credits.",
+        "note": "Every tool requires an API key via the X-API-Key header — reads included. Read tools cost 0 credits; write tools additionally require the matching scope and credits.",
     })
 
 
@@ -254,6 +255,79 @@ async def shutdown():
     logger.info("Timepoint MCP server stopped")
 
 
+# --- Tool-discovery gate ---
+#
+# Individual tools authenticate themselves (see app/auth/require.py), but
+# `tools/list` is handled by FastMCP before any tool runs, so an anonymous
+# caller could still enumerate every tool name, description and argument
+# schema. This middleware closes that: `tools/list` now needs a valid key
+# like everything else.
+#
+# `initialize` and `notifications/*` stay open — they carry no data and the
+# Streamable HTTP handshake has to complete before a client can send a key
+# on a session at all.
+_OPEN_METHODS = frozenset({"initialize", "notifications/initialized", "ping"})
+
+
+class ToolListAuthMiddleware:
+    """Pure-ASGI middleware: require a valid API key for `tools/list`.
+
+    Written at the ASGI level rather than as a BaseHTTPMiddleware because the
+    JSON-RPC body has to be inspected and then replayed intact to the MCP
+    sub-app; BaseHTTPMiddleware's request/response wrapping interferes with
+    the Streamable HTTP event stream.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope.get("method") != "POST":
+            return await self.app(scope, receive, send)
+
+        # Buffer the body so it can be both inspected and replayed.
+        chunks: list[bytes] = []
+        more = True
+        while more:
+            message = await receive()
+            if message["type"] != "http.request":
+                break
+            chunks.append(message.get("body", b""))
+            more = message.get("more_body", False)
+        body = b"".join(chunks)
+
+        async def replay():
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        try:
+            method = json.loads(body).get("method")
+        except (ValueError, AttributeError):
+            method = None
+
+        if method == "tools/list":
+            headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+            api_key = headers.get("x-api-key", "")
+            info = await key_store.validate_key(api_key) if (api_key and key_store) else None
+            if info is None:
+                response = JSONResponse(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": None,
+                        "error": {
+                            "code": -32001,
+                            "message": (
+                                "This server requires an API key. Set the X-API-Key header. "
+                                "Get a key at https://timepointai.com or contact @timepointai on X."
+                            ),
+                        },
+                    },
+                    status_code=401,
+                )
+                return await response(scope, replay, send)
+
+        return await self.app(scope, replay, send)
+
+
 # --- ASGI app ---
 def create_http_app() -> Starlette:
     """Create the Starlette app that serves both MCP and plain HTTP endpoints.
@@ -298,7 +372,8 @@ def create_http_app() -> Starlette:
     )
 
     # Mount MCP at /mcp (sub-app's internal path is "/", so /mcp/ -> sub-app "/")
-    app.mount("/mcp", mcp_app)
+    # Wrapped so `tools/list` requires a key; per-tool auth still applies inside.
+    app.mount("/mcp", ToolListAuthMiddleware(mcp_app))
 
     return app
 
