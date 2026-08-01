@@ -234,7 +234,7 @@ async def startup():
         logger.warning("No GATEWAY_URL/GATEWAY_SERVICE_KEY — credit operations will be unavailable")
 
     # Register tools
-    register_clockchain_tools(mcp, clockchain_client)
+    register_clockchain_tools(mcp, clockchain_client, key_store)
     register_clockchain_write_tools(mcp, clockchain_client, flash_client, key_store, rate_limiter, gateway_client)
     logger.info("Timepoint MCP server started (v%s)", VERSION)
 

@@ -7,10 +7,31 @@ cap 1..200), leading-slash stripping, 404 unwrapping, and the tool-level
 web_url deep link + {error, suggestion} shapes.
 """
 
+import functools
+
 import pytest
 
 from app.clients.clockchain import ClockchainClient
 from app.tools.clockchain import register_clockchain_tools
+
+
+class _FakeRequest:
+    """Minimal stand-in for the Starlette request FastMCP injects — carries
+    a fixed test API key so routing tests don't need to exercise real auth."""
+
+    def __init__(self, api_key="test-read-key"):
+        self.headers = {"X-API-Key": api_key}
+
+
+class _FakeKeyStore:
+    """Always validates _FakeRequest's fixed key with the "read" scope."""
+
+    async def validate_key(self, api_key):
+        if api_key != "test-read-key":
+            return None
+        return type(
+            "KeyInfo", (), {"id": "k1", "user_id": "test-user", "scopes": ["read", "generate"]}
+        )()
 
 
 class _Resp:
@@ -56,14 +77,19 @@ def _client(payload, status_code=200):
 
 
 class _FakeMCP:
-    """Captures functions registered via @mcp.tool() so tests can call them."""
+    """Captures functions registered via @mcp.tool() so tests can call them.
+
+    Wraps each tool with a pre-authenticated fake request so existing
+    positional call sites keep working now that every read tool requires
+    auth.
+    """
 
     def __init__(self):
         self.tools = {}
 
     def tool(self):
         def decorator(fn):
-            self.tools[fn.__name__] = fn
+            self.tools[fn.__name__] = functools.partial(fn, request=_FakeRequest())
             return fn
 
         return decorator
@@ -72,7 +98,7 @@ class _FakeMCP:
 def _tools(payload, status_code=200):
     c, http = _client(payload, status_code)
     mcp = _FakeMCP()
-    register_clockchain_tools(mcp, c)
+    register_clockchain_tools(mcp, c, _FakeKeyStore())
     return mcp.tools, http
 
 
@@ -191,6 +217,6 @@ async def test_explore_graph_tool_never_raises_on_http_failure():
     c, _ = _client({})
     c._client = _ExplodingHTTP()
     mcp = _FakeMCP()
-    register_clockchain_tools(mcp, c)
+    register_clockchain_tools(mcp, c, _FakeKeyStore())
     result = await mcp.tools["explore_graph"]("/x")
     assert set(result) == {"error", "suggestion"}

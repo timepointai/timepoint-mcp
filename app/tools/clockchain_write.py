@@ -13,56 +13,13 @@ from pydantic import Field
 
 from app.auth.keys import KeyInfo, KeyStore
 from app.auth.rate_limit import RateLimiter
+from app.auth.require import AuthError, require_auth as _require_auth
 from app.billing.credits import COSTS, check_balance, spend_credits
 from app.clients.clockchain import ClockchainClient
 from app.clients.flash import FlashClient
 from app.clients.gateway import GatewayClient
 
 logger = logging.getLogger("mcp.tools.clockchain_write")
-
-
-class AuthError(Exception):
-    """Raised when authentication or authorization fails."""
-
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(message)
-
-
-async def _require_auth(
-    request,
-    key_store: KeyStore | None,
-    required_scope: str,
-) -> KeyInfo:
-    """Extract API key from request headers, validate, and check scope.
-
-    Returns KeyInfo on success, raises AuthError on failure.
-    """
-    if key_store is None:
-        raise AuthError("Authentication service unavailable. Try again later.")
-
-    # FastMCP injects the Starlette request via context
-    api_key = ""
-    if hasattr(request, "headers"):
-        api_key = request.headers.get("x-api-key", "") or request.headers.get("X-API-Key", "")
-
-    if not api_key:
-        raise AuthError(
-            "This tool requires an API key. Set the X-API-Key header. "
-            "Get a key at https://timepointai.com or contact @timepointai on X."
-        )
-
-    info = await key_store.validate_key(api_key)
-    if info is None:
-        raise AuthError("Invalid or expired API key.")
-
-    if required_scope not in info.scopes:
-        raise AuthError(
-            f"Your API key lacks the '{required_scope}' scope. "
-            f"Current scopes: {info.scopes}. Contact support to upgrade."
-        )
-
-    return info
 
 
 def _check_write_rate(key_info: KeyInfo, rate_limiter: RateLimiter) -> None:
