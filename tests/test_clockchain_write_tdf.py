@@ -37,7 +37,10 @@ class _ClockchainClient:
 
 
 @pytest.mark.asyncio
-async def test_index_tdf_defaults_schema_version_to_v02():
+async def test_index_tdf_defaults_schema_version_to_v02(monkeypatch):
+    monkeypatch.setattr(
+        "app.auth.require.get_http_headers", lambda **kwargs: {"x-api-key": "tp_mcp_x"}
+    )
     mcp = _MCPStub()
     register_clockchain_write_tools(
         mcp=mcp,
@@ -55,7 +58,7 @@ async def test_index_tdf_defaults_schema_version_to_v02():
         "month": 1,
         "day": 1,
     }
-    out = await fn(payload, request=type("R", (), {"headers": {"X-API-Key": "tp_mcp_x"}})())
+    out = await fn(payload)
 
     assert out["indexed"] is True
     assert payload["schema_version"] == "0.2"

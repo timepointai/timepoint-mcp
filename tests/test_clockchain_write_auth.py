@@ -8,9 +8,9 @@ from app.auth.rate_limit import RateLimiter
 from app.tools.clockchain_write import AuthError, _check_write_rate, _require_auth
 
 
-class _Req:
-    def __init__(self, headers: dict[str, str]):
-        self.headers = headers
+def _set_key_header(monkeypatch, api_key=None):
+    headers = {"x-api-key": api_key} if api_key else {}
+    monkeypatch.setattr("app.auth.require.get_http_headers", lambda **kwargs: headers)
 
 
 class _KeyStore:
@@ -37,27 +37,31 @@ BASE_KEY_INFO = KeyInfo(
 
 
 @pytest.mark.asyncio
-async def test_require_auth_missing_key_header():
+async def test_require_auth_missing_key_header(monkeypatch):
+    _set_key_header(monkeypatch)
     with pytest.raises(AuthError):
-        await _require_auth(_Req({}), _KeyStore(BASE_KEY_INFO), "generate")
+        await _require_auth(_KeyStore(BASE_KEY_INFO), "generate")
 
 
 @pytest.mark.asyncio
-async def test_require_auth_invalid_key():
+async def test_require_auth_invalid_key(monkeypatch):
+    _set_key_header(monkeypatch, api_key="tp_mcp_bad")
     with pytest.raises(AuthError):
-        await _require_auth(_Req({"X-API-Key": "tp_mcp_bad"}), _KeyStore(None), "generate")
+        await _require_auth(_KeyStore(None), "generate")
 
 
 @pytest.mark.asyncio
-async def test_require_auth_missing_scope():
+async def test_require_auth_missing_scope(monkeypatch):
     read_only = replace(BASE_KEY_INFO, scopes=["read"])
+    _set_key_header(monkeypatch, api_key="tp_mcp_good")
     with pytest.raises(AuthError):
-        await _require_auth(_Req({"X-API-Key": "tp_mcp_good"}), _KeyStore(read_only), "generate")
+        await _require_auth(_KeyStore(read_only), "generate")
 
 
 @pytest.mark.asyncio
-async def test_require_auth_success():
-    info = await _require_auth(_Req({"X-API-Key": "tp_mcp_good"}), _KeyStore(BASE_KEY_INFO), "generate")
+async def test_require_auth_success(monkeypatch):
+    _set_key_header(monkeypatch, api_key="tp_mcp_good")
+    info = await _require_auth(_KeyStore(BASE_KEY_INFO), "generate")
     assert info.user_id == "user-1"
 
 

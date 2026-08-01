@@ -7,24 +7,24 @@ client-side clamps (depth<=4, limit<=200, max_hops<=10), 404 unwrapping,
 and the tool-level {error, suggestion} shapes.
 """
 
-import functools
-
 import pytest
 
 from app.clients.clockchain import ClockchainClient
 from app.tools.clockchain import register_clockchain_tools
 
 
-class _FakeRequest:
-    """Minimal stand-in for the Starlette request FastMCP injects — carries
-    a fixed test API key so routing tests don't need to exercise real auth."""
-
-    def __init__(self, api_key="test-read-key"):
-        self.headers = {"X-API-Key": api_key}
+@pytest.fixture(autouse=True)
+def _authenticated_request(monkeypatch):
+    """Every tool call in this file goes through require_auth(); stub the
+    header source so routing tests don't need to exercise real auth."""
+    monkeypatch.setattr(
+        "app.auth.require.get_http_headers",
+        lambda **kwargs: {"x-api-key": "test-read-key"},
+    )
 
 
 class _FakeKeyStore:
-    """Always validates _FakeRequest's fixed key with the "read" scope."""
+    """Always validates the fixed test key with the "read" scope."""
 
     async def validate_key(self, api_key):
         if api_key != "test-read-key":
@@ -75,19 +75,14 @@ def _client(payload, status_code=200):
 
 
 class _FakeMCP:
-    """Captures functions registered via @mcp.tool() so tests can call them.
-
-    Wraps each tool with a pre-authenticated fake request so existing
-    positional call sites (e.g. tools["traverse_moments"]("/x")) keep
-    working now that every read tool requires auth.
-    """
+    """Captures functions registered via @mcp.tool() so tests can call them."""
 
     def __init__(self):
         self.tools = {}
 
     def tool(self):
         def decorator(fn):
-            self.tools[fn.__name__] = functools.partial(fn, request=_FakeRequest())
+            self.tools[fn.__name__] = fn
             return fn
 
         return decorator

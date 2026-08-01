@@ -48,7 +48,6 @@ def register_clockchain_write_tools(
         query: Annotated[str, Field(description="What historical event or moment to generate, e.g. 'Battle of Thermopylae' or 'First Moon Landing'")],
         preset: Annotated[str, Field(description="Generation quality preset: 'balanced' (5 credits), 'hd' (10 credits), 'hyper' (5 credits), or 'gemini3' (5 credits)")] = "balanced",
         visibility: Annotated[str, Field(description="Visibility of the generated moment: 'private' (only you) or 'public'")] = "private",
-        request=None,
     ) -> dict:
         """Generate a new historical moment using Timepoint's AI reality-writing engine.
 
@@ -62,7 +61,7 @@ def register_clockchain_write_tools(
         """
         # Auth
         try:
-            key_info = await _require_auth(request, key_store, "generate")
+            key_info = await _require_auth(key_store, "generate")
             _check_write_rate(key_info, rate_limiter)
         except AuthError as e:
             return {"error": e.message}
@@ -179,7 +178,6 @@ def register_clockchain_write_tools(
     @mcp.tool()
     async def publish_moment(
         path: Annotated[str, Field(description="Canonical path of the moment to publish, e.g. '/1776/july/4/1200/usa/pennsylvania/philadelphia/signing-declaration-of-independence'")],
-        request=None,
     ) -> dict:
         """Publish a private moment to make it publicly visible in the clockchain.
 
@@ -187,7 +185,7 @@ def register_clockchain_write_tools(
         No credits are charged for publishing.
         """
         try:
-            key_info = await _require_auth(request, key_store, "generate")
+            key_info = await _require_auth(key_store, "generate")
             _check_write_rate(key_info, rate_limiter)
         except AuthError as e:
             return {"error": e.message}
@@ -226,7 +224,6 @@ def register_clockchain_write_tools(
     @mcp.tool()
     async def index_moment_from_tdf(
         tdf_record: Annotated[dict, Field(description="A complete TDF (Timepoint Data Format) record to index directly into the clockchain")],
-        request=None,
     ) -> dict:
         """Index a pre-formatted TDF record directly into the clockchain.
 
@@ -238,7 +235,7 @@ def register_clockchain_write_tools(
         model_permissiveness, generation_id, graph_state_hash) should also be populated.
         """
         try:
-            key_info = await _require_auth(request, key_store, "admin")
+            key_info = await _require_auth(key_store, "admin")
             _check_write_rate(key_info, rate_limiter)
         except AuthError as e:
             return {"error": e.message}

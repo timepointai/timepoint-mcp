@@ -41,7 +41,6 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         year_from: Annotated[int | None, Field(description="Filter: earliest year (use negative for BCE, e.g. -500)")] = None,
         year_to: Annotated[int | None, Field(description="Filter: latest year")] = None,
         limit: Annotated[int, Field(description="Max results to return (1-100)", ge=1, le=100)] = 20,
-        request=None,
     ) -> dict:
         """Search the Timepoint temporal causal graph for historical events and moments.
 
@@ -57,7 +56,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         - search_moments("industrial revolution", limit=5)
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         results = await clockchain_client.search(query, limit=limit)
@@ -92,7 +91,6 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
     async def get_moment(
         path: Annotated[str, Field(description="Canonical path to the moment, e.g. '/44/march/15/1200/italy/lazio/rome/assassination-of-julius-caesar'")],
         format: Annotated[str, Field(description="Response format: 'default' for full detail or 'tdf' for Timepoint Data Format")] = "default",
-        request=None,
     ) -> dict:
         """Get full detail for a specific historical moment by its canonical path.
 
@@ -104,7 +102,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         result = await clockchain_client.get_moment(path, format=format)
@@ -115,7 +113,6 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
     @mcp.tool()
     async def browse_graph(
         path: Annotated[str, Field(description="Path prefix to browse. Use '/' for root, then drill into years, months, etc.")] = "/",
-        request=None,
     ) -> dict:
         """Browse the temporal graph hierarchy like a filesystem of history.
 
@@ -132,7 +129,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         result = await clockchain_client.browse(path.strip("/"))
@@ -143,7 +140,6 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
     @mcp.tool()
     async def get_connections(
         path: Annotated[str, Field(description="Canonical path to the moment")],
-        request=None,
     ) -> dict:
         """Get causal and thematic connections for a historical moment.
 
@@ -164,7 +160,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         result = await clockchain_client.neighbors(path.strip("/"))
@@ -179,7 +175,6 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         depth: Annotated[int, Field(description="How many hops to walk from the anchor (1-4). Depth 1 equals get_connections; 2-3 reveals chains; 4 maps a whole neighborhood.", ge=1, le=4)] = 2,
         edge_types: Annotated[str | None, Field(description="Comma-separated edge types to follow. Default: causes,caused_by,precedes,follows,influences (the causal core). Add contemporaneous, same_era, same_location, same_conflict, same_figure, thematic, or challenges to widen the walk.")] = None,
         limit: Annotated[int, Field(description="Max nodes to return (1-200). The response sets truncated=true if this clipped the walk.", ge=1, le=200)] = 50,
-        request=None,
     ) -> dict:
         """Walk the causal graph N hops from a moment to map its causes and consequences.
 
@@ -201,7 +196,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         if direction not in VALID_DIRECTIONS:
@@ -237,7 +232,6 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         from_path: Annotated[str, Field(description="Canonical path of the starting moment")],
         to_path: Annotated[str, Field(description="Canonical path of the destination moment")],
         max_hops: Annotated[int, Field(description="Max connections to cross before giving up (1-10). More hops finds longer chains but weaker relationships.", ge=1, le=10)] = 6,
-        request=None,
     ) -> dict:
         """Find the shortest chain of historical connections linking two moments.
 
@@ -258,7 +252,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         try:
@@ -281,7 +275,6 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         path: Annotated[str, Field(description="Canonical path of the root moment, e.g. '/1914/june/28/1030/bosnia/sarajevo/assassination-of-franz-ferdinand'. Get paths from search_moments or browse_graph.")],
         depth: Annotated[int, Field(description="Hop radius around the root (1-3). 1 = direct neighborhood; 3 = wide local map.", ge=1, le=3)] = 1,
         cap: Annotated[int, Field(description="Max nodes to return (1-200). The strongest-weighted connections are kept first; meta.truncated=true means the cap clipped the neighborhood.", ge=1, le=200)] = 100,
-        request=None,
     ) -> dict:
         """Agent-native view of the live Explore instrument: a bounded induced subgraph around a moment.
 
@@ -303,7 +296,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         # Clamp defensively (mirrors the client clamps) so the web_url deep
@@ -328,7 +321,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         return result
 
     @mcp.tool()
-    async def today_in_history(request=None) -> dict:
+    async def today_in_history() -> dict:
         """Get historical events that happened on today's date (month and day).
 
         Returns moments from the temporal graph that share today's month and day,
@@ -337,13 +330,13 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         return await clockchain_client.today()
 
     @mcp.tool()
-    async def random_moment(request=None) -> dict:
+    async def random_moment() -> dict:
         """Get a random historical moment from the temporal graph.
 
         Good for serendipitous discovery, creative writing prompts, or when the user
@@ -351,13 +344,13 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         return await clockchain_client.random()
 
     @mcp.tool()
-    async def graph_stats(request=None) -> dict:
+    async def graph_stats() -> dict:
         """Get statistics about the Timepoint temporal knowledge graph.
 
         Returns total nodes (historical moments), total edges (connections),
@@ -368,7 +361,7 @@ def register_clockchain_tools(mcp, clockchain_client, key_store: KeyStore | None
         Requires an API key with the "read" scope.
         """
         try:
-            await require_auth(request, key_store, "read")
+            await require_auth(key_store, "read")
         except AuthError as e:
             return {"error": e.message}
         data = await clockchain_client.stats()
