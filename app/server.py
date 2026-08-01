@@ -67,13 +67,28 @@ async def health(request: Request) -> JSONResponse:
         except Exception:
             db_ok = False
 
+    # mcp.list_tools() is the supported API on fastmcp 3.x. The previous
+    # `mcp._tool_manager._tools` probe hit an attribute that does not exist on
+    # this version, so health silently reported the hardcoded fallback of 7
+    # while the server actually served 13 tools.
+    try:
+        tool_count = len(await mcp.list_tools())
+    except Exception:
+        tool_count = None
+
     return JSONResponse({
         "status": "ok" if db_ok else "degraded",
         "version": VERSION,
-        "tools": len(mcp._tool_manager._tools) if hasattr(mcp, "_tool_manager") else 7,
+        "tools": tool_count,
         "transport": "streamable-http",
         "database": "connected" if db_ok else "disconnected",
         "clockchain": bool(settings.FLASH_URL or settings.CLOCKCHAIN_URL),
+        "auth": {
+            "required": True,
+            "scope": "all tools including reads, and tools/list",
+            "accepts": ["X-API-Key"],
+            "get_a_key": "https://timepointai.com/dev",
+        },
     })
 
 
