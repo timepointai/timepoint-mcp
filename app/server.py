@@ -296,8 +296,18 @@ class ToolListAuthMiddleware:
             more = message.get("more_body", False)
         body = b"".join(chunks)
 
+        # Replay the buffered body on the first receive(), then delegate to the
+        # real receive() for every later call. Returning the body once and then
+        # nothing hangs the Streamable HTTP transport, which calls receive()
+        # repeatedly for the duration of the stream.
+        replayed = False
+
         async def replay():
-            return {"type": "http.request", "body": body, "more_body": False}
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
 
         try:
             method = json.loads(body).get("method")
